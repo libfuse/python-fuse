@@ -1,3 +1,10 @@
+2004-11-21  Sebastien Delafond <sdelafond@gmx.net>
+
+	* Took over maintainership.
+	* Ported to compile with fuse 2.1
+	* Added comment to xmp.py
+	* Added my name to the AUTHORS file
+	
 2004-09-27  Miklos Szeredi <miklos@szeredi.hu>
 
 	* Applied patch by Steven James.  The Python binding in the CVS

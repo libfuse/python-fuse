@@ -8,9 +8,8 @@ from distutils.core import setup, Extension
 
 setup(name="fuse",
       version="0.1",
-      ext_modules=[Extension("_fusemodule", ["_fusemodule.c"],
-                             library_dirs=["../lib/.libs",],
-                             include_dirs=["../include",],
+      ext_modules=[Extension("_fusemodule",
+                             ["_fusemodule.c"],
                              libraries=["fuse",],
                              ),
                    ],

@@ -1,5 +1,6 @@
 The best way to install this python FUSE module is:
- 1. make sure the rest of FUSE (incl libfuse.a) has built successfully
+ 1. make sure the rest of FUSE (incl libfuse.a or libfuse.so) has built 
+    successfully
  2. type 'python setup.py build'
  3. if all has gone ok, become root and type 'python setup.py install'
 
