@@ -321,15 +321,15 @@ static int release_func(const char *path, int flags)
 static int statfs_func( const char *dummy, struct statfs *fst)
 {
   int i;
-  long retvalues[6];
+  long retvalues[7];
   PyObject *v = PyObject_CallFunction(statfs_cb, "");
 PROLOGUE
 
   if (!PySequence_Check(v))
     { goto OUT_DECREF; }
- if (PySequence_Size(v) < 6)
+ if (PySequence_Size(v) < 7)
    { goto OUT_DECREF; }
- for(i=0; i<6; i++)
+ for(i=0; i<7; i++)
    {
      PyObject *tmp = PySequence_GetItem(v, i);
      retvalues[i] = PyInt_Check(tmp)
@@ -342,15 +342,16 @@ PROLOGUE
  fst->f_bsize	= retvalues[0];
  fst->f_blocks	= retvalues[1];
  fst->f_bfree	= retvalues[2];
- fst->f_files	= retvalues[3];
- fst->f_ffree	= retvalues[4];
- fst->f_namelen	= retvalues[5];
+ fst->f_bavail	= retvalues[3];
+ fst->f_files	= retvalues[4];
+ fst->f_ffree	= retvalues[5];
+ fst->f_namelen	= retvalues[6];
 
  ret = 0;
  
 #ifdef IGNORE_THIS
- printf("block_size=%ld, blocks=%ld, blocks_free=%ld, files=%ld, files_free=%ld, namelen=%ld\n",
-        retvalues[0], retvalues[1], retvalues[2], retvalues[3], retvalues[4], retvalues[5]);
+ printf("block_size=%ld, blocks=%ld, blocks_free=%ld, blocks_avail=%ld, files=%ld, files_free=%ld, namelen=%ld\n",
+        retvalues[0], retvalues[1], retvalues[2], retvalues[3], retvalues[4], retvalues[5], retvalues[6]);
 #endif
 
 EPILOGUE
