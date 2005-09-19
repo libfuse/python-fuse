@@ -110,7 +110,7 @@
 /*
     Copyright (C) 2001  Jeff Epler  &lt;jepler@unpythonic.dhs.org&gt;
 
-    This program can be distributed under the terms of the GNU GPL.
+    This program can be distributed under the terms of the GNU LGPL.
     See the file COPYING.
 */
 
@@ -516,7 +516,7 @@ init_fuse(void)
 <t tx="davidmcnab.121303142957.29">#
 #    Copyright (C) 2001  Jeff Epler  &lt;jepler@unpythonic.dhs.org&gt;
 #
-#    This program can be distributed under the terms of the GNU GPL.
+#    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.
 #
 
@@ -614,7 +614,7 @@ clean:
 #
 #    Copyright (C) 2001  Jeff Epler  &lt;jepler@unpythonic.dhs.org&gt;
 #
-#    This program can be distributed under the terms of the GNU GPL.
+#    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.
 #
 
@@ -1016,7 +1016,7 @@ EPILOGUE
 #
 #    Copyright (C) 2001  Jeff Epler  &lt;jepler@unpythonic.dhs.org&gt;
 #
-#    This program can be distributed under the terms of the GNU GPL.
+#    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.
 #
 
