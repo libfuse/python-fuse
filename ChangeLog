@@ -1,3 +1,13 @@
+2006-02-03  Sebastien Delafond <sdelafond@gmx.net>
+  
+        * Removed unnecessary "st->st_ino = 0" line in _fusemodule.c.
+	* Added __init__ argument handling in fuse.py. Command-line 
+          arguments still take precedence over contructor ones.
+	* Removed unused os module from fuse.py.
+        * Changed  def read(self, path, length, offset) to 
+          def read(self, path, length, offset) so that len() can be
+          used inside read().
+
 2005-04-07  Sebastien Delafond <sdelafond@gmx.net>
 
         * Added support for statfs.f_bavail, so that df can correctly report

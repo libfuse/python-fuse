@@ -123,11 +123,11 @@ class Xmp(Fuse):
     
     #@-node:open
     #@+node:read
-    def read(self, path, len, offset):
+    def read(self, path, length, offset):
         #print "xmp.py:Xmp:read: %s" % path
     	f = open(path, "r")
     	f.seek(offset)
-    	return f.read(len)
+    	return f.read(length)
     
     #@-node:read
     #@+node:write

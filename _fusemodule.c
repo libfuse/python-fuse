@@ -88,7 +88,6 @@ st->st_ctime= PyInt_AsLong(PySequence_GetItem(v, 9));
 /* Fill in fields not provided by Python lstat() */
 st->st_blksize= 4096;
 st->st_blocks= (st->st_size + 511)/512;
-st->st_ino  = 0;
 
 ret = 0;
 EPILOGUE

@@ -23,7 +23,7 @@ except:
  
 from _fuse import main, FuseGetContext, FuseInvalidate
 from string import join
-import os, sys
+import sys
 from errno import *
 
 #@-node:imports
@@ -63,11 +63,22 @@ class Fuse:
     def __init__(self, *args, **kw):
     
         # default attributes
-        self.optlist = []
-        self.optdict = {}
-        self.mountpoint = None
-    
-        # grab arguments, if any
+        if args == ():
+            # there is a self.optlist.append() later on, make sure it won't
+            # bomb out.
+            self.optlist = []
+        else:
+            self.optlist = args
+        self.optdict = kw
+
+        if len(self.optlist) == 1:
+            self.mountpoint = self.optlist[0]
+        else:
+            self.mountpoint = None
+        
+        # grab command-line arguments, if any.
+        # Those will override whatever parameters
+        # were passed to __init__ directly.
         argv = sys.argv
         argc = len(argv)
         if argc > 1:
