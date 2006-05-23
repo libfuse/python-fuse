@@ -12,10 +12,21 @@
 #@+others
 #@+node:imports
 
-from fuse import Fuse
 import os
 from errno import *
 from stat import *
+try:
+    from fuse import Fuse
+except ImportError:
+    import sys
+    print >> sys.stderr, """
+! If you are trying the Python example filesystem from
+! the fuse-python source directory, without installation,
+! you are suggested to link or copy build/lib.*/_fusemodule.so
+! to the root of the source tree.
+"""
+    raise
+
 
 import thread
 #@-node:imports

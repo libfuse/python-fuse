@@ -1,5 +1,8 @@
 2006-05-23  Csaba Henk <csaba.henk@creo.hu>
         * Fix statfs index mismatch in xmp.py.
+        * Rebase build system on pkg-config.
+	   - Credits: setup.py based on that of south-python (python bindings to
+	     icecast)
 
 2006-02-03  Sebastien Delafond <sdelafond@gmx.net>
   
