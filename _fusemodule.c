@@ -591,16 +591,22 @@ static char FuseInvalidate__doc__[] =
 
 static PyObject *FuseInvalidate( PyObject *self, PyObject *args) {
 	char *path;
-	PyObject *ret;
+	PyObject *ret, *arg1;
 	int err;
 
-	if(!PyString_Check(args)) { err = -EINVAL; goto OUT; }
+	if (! (arg1 = PyTuple_GetItem(args, 1)))
+		return(NULL);
 
-	path = PyString_AsString(args);
+	if(!PyString_Check(arg1)) {
+		PyErr_SetString(PyExc_TypeError, "argument must be a string");
+
+		return(NULL);
+	}
+
+	path = PyString_AsString(arg1);
 
 	err = fuse_invalidate(fuse, path);
 
-OUT:
 	ret = PyInt_FromLong(err);
 
 	return(ret);
