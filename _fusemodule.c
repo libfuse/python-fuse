@@ -536,11 +536,16 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	 * to hack on compatibility with other parts of the new API. First and
 	 * foremost, real C argc/argv would be good to get at...
 	 */
-	if (kopts &&
-	    (fuse_opt_add_arg(&margs, "") == -1 ||
-	     fuse_opt_add_arg(&margs, "-o") == -1 ||
-	     fuse_opt_add_arg(&margs, kopts) == -1)) {
+
+#define opts2args(opts, args)			\
+	(opts && 				\
+	 (fuse_opt_add_arg(args, "") == -1 || 	\
+	 fuse_opt_add_arg(args, "-o") == -1 ||	\
+	 fuse_opt_add_arg(args, opts) == -1))
+
+	if (opts2args(kopts, &margs) || opts2args(lopts, &fargs)) {
 		fuse_opt_free_args(&margs);
+		fuse_opt_free_args(&fargs);
 		fprintf(stderr, "out of memory\n");
 	}
 	chanfd = fuse_mount(mountpoint,&margs);
