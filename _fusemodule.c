@@ -14,11 +14,22 @@
     
 */
 
+#ifndef FUSE_VERSION
+#ifndef FUSE_MAKE_VERSION
+#define FUSE_MAKE_VERSION(maj, min)  ((maj) * 10 + (min))
+#endif
+#define FUSE_VERSION FUSE_MAKE_VERSION(FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION)
+#endif
+
+#define FUSE_USE_VERSION 26
 //@+others
 //@+node:includes
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/mount.h>
+#include <time.h>
 #include <Python.h>
 #include "fuse.h"
-#include <time.h>
 //@-node:includes
 //@+node:globals
 
@@ -139,7 +150,11 @@ static int getdir_add_entry(PyObject *w, fuse_dirh_t dh, fuse_dirfil_t df)
 		goto out_decref;
 	}
 
+#if FUSE_VERSION >= 21
+	ret = df(dh, PyString_AsString(o0), PyInt_AsLong(o1), 0);
+#else
 	ret = df(dh, PyString_AsString(o0), PyInt_AsLong(o1));	
+#endif
 
 out_decref:
 	Py_DECREF(o0);
@@ -276,7 +291,12 @@ static int utime_func(const char *path, struct utimbuf *u) {
 //@-node:utime_func
 //@+node:read_func
 
+#if FUSE_VERSION >= 22
+static int read_func(const char *path, char *buf, size_t s, off_t off,
+                     struct fuse_file_info *fi)
+#else
 static int read_func(const char *path, char *buf, size_t s, off_t off)
+#endif
 {
 	PyObject *v = PyObject_CallFunction(read_cb, "sii", path, s, off);
 	PROLOGUE
@@ -290,7 +310,12 @@ static int read_func(const char *path, char *buf, size_t s, off_t off)
 //@-node:read_func
 //@+node:write_func
 
+#if FUSE_VERSION >= 22
+static int write_func(const char *path, const char *buf, size_t t, off_t off,
+                      struct fuse_file_info *fi)
+#else
 static int write_func(const char *path, const char *buf, size_t t, off_t off)
+#endif
 {
 	PyObject *v = PyObject_CallFunction(write_cb,"ss#i", path, buf, t, off);
 	PROLOGUE
@@ -299,36 +324,59 @@ static int write_func(const char *path, const char *buf, size_t t, off_t off)
 //@-node:write_func
 //@+node:open_func
 
+#if FUSE_VERSION >= 22
+static int open_func(const char *path, struct fuse_file_info *fi)
+{
+	PyObject *v = PyObject_CallFunction(open_cb, "si", path, fi->flags);
+#else
 static int open_func(const char *path, int mode)
 {
 	PyObject *v = PyObject_CallFunction(open_cb, "si", path, mode);
+#endif
 	PROLOGUE
     printf("open_func: path=%s\n", path);
 	EPILOGUE
 }
 //@-node:open_func
 //@+node:release_func
+#if FUSE_VERSION >= 22
+static int release_func(const char *path, struct fuse_file_info *fi)
+{
+  PyObject *v = PyObject_CallFunction(release_cb, "si", path, fi->flags);
+#else
 static int release_func(const char *path, int flags)
 {
   PyObject *v = PyObject_CallFunction(release_cb, "si", path, flags);
+#endif
   PROLOGUE
     //printf("release_func: path=%s flags=%d\n", path, flags);
   EPILOGUE
 }
 //@-node:release_func
 //@+node:statfs_func
+#if FUSE_VERSION >= 25
+static int statfs_func( const char *dummy, struct statvfs *fst)
+#else
 static int statfs_func( const char *dummy, struct statfs *fst)
+#endif
 {
-  int i;
-  long retvalues[7];
+  int i, seqs;
+  long retvalues[8];
   PyObject *v = PyObject_CallFunction(statfs_cb, "");
 PROLOGUE
 
   if (!PySequence_Check(v))
     { goto OUT_DECREF; }
- if (PySequence_Size(v) < 7)
+ seqs = MIN(PySequence_Size(v),
+#if FUSE_VERSION >= 25
+            8
+#else
+            7
+#endif
+           );
+ if (seqs < 7)
    { goto OUT_DECREF; }
- for(i=0; i<7; i++)
+ for(i=0; i<seqs; i++)
    {
      PyObject *tmp = PySequence_GetItem(v, i);
      retvalues[i] = PyInt_Check(tmp)
@@ -344,7 +392,12 @@ PROLOGUE
  fst->f_bavail	= retvalues[3];
  fst->f_files	= retvalues[4];
  fst->f_ffree	= retvalues[5];
+#if FUSE_VERSION >= 25
+ fst->f_namemax = retvalues[6];
+ fst->f_frsize = retvalues[seqs >= 8 ? 7 : 0];
+#else
  fst->f_namelen	= retvalues[6];
+#endif
 
  ret = 0;
  
@@ -359,9 +412,15 @@ EPILOGUE
 
 //@-node:statfs_func
 //@+node:fsync_func
+#if FUSE_VERSION >= 22
+static int fsync_func(const char *path, int datasync, struct fuse_file_info *fi)
+{
+	PyObject *v = PyObject_CallFunction(fsync_cb, "si", path, datasync);
+#else
 static int fsync_func(const char *path, int isfsyncfile)
 {
 	PyObject *v = PyObject_CallFunction(fsync_cb, "si", path, isfsyncfile);
+#endif
 	PROLOGUE
 	EPILOGUE
 }
@@ -377,7 +436,11 @@ static void process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
 	PyEval_AcquireLock();
 	state = PyThreadState_New(interp);
 	PyThreadState_Swap(state);
+#if FUSE_VERSION >= 22
+	fuse_process_cmd(f, cmd);
+#else
 	__fuse_process_cmd(f, cmd);
+#endif
 	PyThreadState_Clear(state);
 	PyThreadState_Swap(NULL);
 	PyThreadState_Delete(state);
@@ -394,7 +457,11 @@ static void pyfuse_loop_mt(struct fuse *f)
 	PyEval_InitThreads();
 	interp = PyThreadState_Get()->interp;
 	save = PyEval_SaveThread();
+#if FUSE_VERSION >= 22
+	fuse_loop_mt_proc(f, process_cmd, interp);
+#else
 	__fuse_loop_mt(f, process_cmd, interp);
+#endif
 	/* Not yet reached: */
 	PyEval_RestoreThread(save);
 }
@@ -406,12 +473,20 @@ static struct fuse *fuse=NULL;
 static PyObject *
 Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 {
-	int fd;
+#if FUSE_VERSION >= 26
+	struct fuse_chan *chanfd;
+#else
+	int chanfd;
+#endif
 	int multithreaded=0;
 	char *lopts=NULL;
 	char *kopts=NULL;
 	char *mountpoint;
 
+#if FUSE_VERSION >= 25
+	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
+	struct fuse_args fargs = FUSE_ARGS_INIT(0, NULL);
+#endif
 	struct fuse_operations op;
 
 	static char  *kwlist[] = {
@@ -455,13 +530,50 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	DO_ONE_ATTR(statfs);
 	DO_ONE_ATTR(fsync);
 
-	fd = fuse_mount(mountpoint, kopts);
-	fuse = fuse_new(fd, lopts, &op);
+#if FUSE_VERSION >= 25
+	/*
+	 * XXX: What comes here is just a ridiculous use of the option parsing API
+	 * to hack on compatibility with other parts of the new API. First and
+	 * foremost, real C argc/argv would be good to get at...
+	 */
+	if (kopts &&
+	    (fuse_opt_add_arg(&margs, "") == -1 ||
+	     fuse_opt_add_arg(&margs, "-o") == -1 ||
+	     fuse_opt_add_arg(&margs, kopts) == -1)) {
+		fuse_opt_free_args(&margs);
+		fprintf(stderr, "out of memory\n");
+	}
+	chanfd = fuse_mount(mountpoint,&margs);
+	fuse_opt_free_args(&margs);
+
+#if FUSE_VERSION >= 26
+	if (! chanfd)
+#else
+	if (chanfd < 0)
+#endif
+		fprintf(stderr, "could not mount fuse filesystem\n");
+
+#if FUSE_VERSION >= 26
+	fuse = fuse_new(chanfd, &fargs, &op, sizeof(op), NULL);
+#else
+	fuse = fuse_new(chanfd, &fargs, &op, sizeof(op));
+#endif
+#else /* FUSE_VERSION >= 25 */
+	chanfd = fuse_mount(mountpoint, kopts);
+#if FUSE_VERSION >= 22
+	fuse = fuse_new(chanfd, lopts, &op, sizeof(op));
+#else
+	fuse = fuse_new(chanfd, lopts, &op);
+#endif
+#endif /* FUSE_VERSION >= 25 */
 	if(multithreaded)
 		pyfuse_loop_mt(fuse);
 	else
 		fuse_loop(fuse);
 
+#if FUSE_VERSION >= 25
+	fuse_opt_free_args(&fargs);
+#endif
     //printf("Fuse_main: called\n");
 
 	Py_INCREF(Py_None);
