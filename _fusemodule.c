@@ -594,12 +594,13 @@ static PyObject *FuseInvalidate( PyObject *self, PyObject *args) {
 	PyObject *ret;
 	int err;
 
-	PyString_Check(args);
+	if(!PyString_Check(args)) { err = -EINVAL; goto OUT; }
 
 	path = PyString_AsString(args);
 
 	err = fuse_invalidate(fuse, path);
 
+OUT:
 	ret = PyInt_FromLong(err);
 
 	return(ret);
