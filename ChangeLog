@@ -1,3 +1,6 @@
+2006-05-23  Csaba Henk <csaba.henk@creo.hu>
+        * Fix statfs index mismatch in xmp.py.
+
 2006-02-03  Sebastien Delafond <sdelafond@gmx.net>
   
         * Removed unnecessary "st->st_ino = 0" line in _fusemodule.c.

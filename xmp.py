@@ -164,7 +164,7 @@ class Xmp(Fuse):
         files = 100000
         files_free = 60000
         namelen = 80
-        return (blocks_size, blocks, blocks_free, files, files_free, namelen)
+        return (blocks_size, blocks, blocks - blocks_free, blocks_free, files, files_free, namelen)
     #@-node:statfs
     #@+node:fsync
     def fsync(self, path, isfsyncfile):
