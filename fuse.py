@@ -21,7 +21,7 @@ try:
 except:
     pass
  
-from _fuse import main, FuseGetContext, FuseInvalidate
+from _fuse import main, FuseGetContext, FuseInvalidate, FuseError
 from string import join
 import sys
 from errno import *
@@ -75,7 +75,17 @@ class Fuse:
             self.mountpoint = self.optlist[0]
         else:
             self.mountpoint = None
-        
+       
+        # This kind of forced commandline parsing still sucks,
+        # but:
+        #  - changing it would hurt compatibility
+        #  - if changed, that should be done cleverly:
+        #    either by calling down to fuse_opt or coded
+        #    purely in python, it should cherry-pick
+        #    some args/opts based on a template and place
+        #    that into a dict, and return the rest, so that
+        #    can be passed to fuselib
+ 
         # grab command-line arguments, if any.
         # Those will override whatever parameters
         # were passed to __init__ directly.
@@ -107,23 +117,48 @@ class Fuse:
 
         d = {'mountpoint': self.mountpoint}
         d['multithreaded'] = self.multithreaded
-        if hasattr( self, 'debug'):
-            d['lopts'] = 'debug';
 
-        k=[]
-        if hasattr(self,'allow_other'):
-                k.append('allow_other')
+        if not hasattr(self, 'fuse_opt_list'):
+                self.fuse_opt_list = []
 
-        if hasattr(self,'kernel_cache'):
-                k.append('kernel_cache')
+        # deprecated direct attributes for some fuse options
+        for a in 'debug', 'allow_other', 'kernel_cache':
+                if hasattr(self, a):
+                        self.fuse_opt_list.append(a);
 
-	if len(k):
-                d['kopts'] = join(k,',')
-	
+        if not hasattr(self, 'fuse_opts'):
+                self.fuse_opts = {}
+        for o in self.fuse_opt_list:
+                self.fuse_opts[o] = True
+
+        nomount = False
+        d['fuse_args'] = [] 
+        # Regarding those lib options which are direct options 
+        # (used as `-x' or `--foo', rather than `-o foo'):
+        # we still prefer to have them as attributes
+        for a in 'help', 'version':
+                if hasattr(self, 'show' + a):
+                        d['fuse_args'].append('--' + a)
+                        nomount = True
+        if hasattr(self, 'foreground'):
+                d['fuse_args'].append('-f')
+
+        opta = []
+        for k in self.fuse_opts.keys():
+                if self.fuse_opts[k] == True:
+                        opta.append(str(k))
+                else:
+                        opta.append(str(k) + '=' + str(self.fuse_opts[k]))
+
+                d['fuse_args'].append("-o" + ",".join(opta)) 
+
     	for a in self._attrs:
     		if hasattr(self,a):
     			d[a] = ErrnoWrapper(getattr(self, a))
-    	apply(main, (), d)
+        try:
+    	     apply(main, (), d)
+        except FuseError:
+             if not nomount: raise
     #@-node:main
     #@-others
 #@-node:class Fuse

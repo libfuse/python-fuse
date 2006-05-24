@@ -43,6 +43,8 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *getdir_cb=NULL,
 
 static int debuglevel=0;
 
+static PyObject *Py_FuseError;
+
 //@-node:globals
 //@+node:PROLOGUE
 #define PROLOGUE \
@@ -449,21 +451,24 @@ static void process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
 //@-node:process_cmd
 //@+node:pyfuse_loop_mt
 
-static void pyfuse_loop_mt(struct fuse *f)
+static int pyfuse_loop_mt(struct fuse *f)
 {
 	PyInterpreterState *interp;
 	PyThreadState *save;
+	int err;
 
 	PyEval_InitThreads();
 	interp = PyThreadState_Get()->interp;
 	save = PyEval_SaveThread();
 #if FUSE_VERSION >= 22
-	fuse_loop_mt_proc(f, process_cmd, interp);
+	err = fuse_loop_mt_proc(f, process_cmd, interp);
 #else
-	__fuse_loop_mt(f, process_cmd, interp);
+	err = __fuse_loop_mt(f, process_cmd, interp);
 #endif
 	/* Not yet reached: */
 	PyEval_RestoreThread(save);
+
+	return(err);
 }
 //@-node:pyfuse_loop_mt
 //@+node:Fuse_main
@@ -473,40 +478,36 @@ static struct fuse *fuse=NULL;
 static PyObject *
 Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 {
-#if FUSE_VERSION >= 26
-	struct fuse_chan *chanfd;
-#else
-	int chanfd;
+#if FUSE_VERSION < 26
+	int fd;
 #endif
-	int multithreaded=0;
-	char *lopts=NULL;
-	char *kopts=NULL;
+	int multithreaded=0, mthp;
 	char *mountpoint;
-
-#if FUSE_VERSION >= 25
-	struct fuse_args margs = FUSE_ARGS_INIT(0, NULL);
-	struct fuse_args fargs = FUSE_ARGS_INIT(0, NULL);
-#endif
+	PyObject *fargseq;
+	int err;
+	int i;
+	char *fmp;
 	struct fuse_operations op;
+	int fargc;
+	char **fargv;
 
 	static char  *kwlist[] = {
 		"getattr", "readlink", "getdir", "mknod",
 		"mkdir", "unlink", "rmdir", "symlink", "rename",
 		"link", "chmod", "chown", "truncate", "utime",
 		"open", "read", "write", "release", "statfs", "fsync",
-		"mountpoint", "kopts", "lopts", "multithreaded", 
-		"debug", NULL};
+		"fuse_args", "mountpoint", "multithreaded", "debug", NULL};
 	
 	memset(&op, 0, sizeof(op));
 
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "|OOOOOOOOOOOOOOOOOOOOsssii", 
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "|OOOOOOOOOOOOOOOOOOOOOsii", 
 					kwlist, &getattr_cb, &readlink_cb, &getdir_cb, &mknod_cb,
 					&mkdir_cb, &unlink_cb, &rmdir_cb, &symlink_cb, &rename_cb,
 					&link_cb, &chmod_cb, &chown_cb, &truncate_cb, &utime_cb,
 					&open_cb, &read_cb, &write_cb, &release_cb, &statfs_cb, &fsync_cb,
-					&mountpoint, &kopts, &lopts, &multithreaded, &debuglevel))
+					&fargseq, &mountpoint, &multithreaded, &debuglevel))
 		return NULL;
-	
+
 #define DO_ONE_ATTR(name) if(name ## _cb) { Py_INCREF(name ## _cb); op.name = name ## _func; } else { op.name = NULL; }
 
 	DO_ONE_ATTR(getattr);
@@ -530,56 +531,75 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	DO_ONE_ATTR(statfs);
 	DO_ONE_ATTR(fsync);
 
-#if FUSE_VERSION >= 25
-	/*
-	 * XXX: What comes here is just a ridiculous use of the option parsing API
-	 * to hack on compatibility with other parts of the new API. First and
-	 * foremost, real C argc/argv would be good to get at...
-	 */
-
-#define opts2args(opts, args)			\
-	(opts && 				\
-	 (fuse_opt_add_arg(args, "") == -1 || 	\
-	 fuse_opt_add_arg(args, "-o") == -1 ||	\
-	 fuse_opt_add_arg(args, opts) == -1))
-
-	if (opts2args(kopts, &margs) || opts2args(lopts, &fargs)) {
-		fuse_opt_free_args(&margs);
-		fuse_opt_free_args(&fargs);
-		fprintf(stderr, "out of memory\n");
+	if (fargseq && !PySequence_Check(fargseq)) {
+		PyErr_SetString(PyExc_TypeError, "fuse_args is not a sequence");
+                return(NULL);
 	}
-	chanfd = fuse_mount(mountpoint,&margs);
-	fuse_opt_free_args(&margs);
 
-#if FUSE_VERSION >= 26
-	if (! chanfd)
-#else
-	if (chanfd < 0)
-#endif
-		fprintf(stderr, "could not mount fuse filesystem\n");
+	fargc = (fargseq ? PySequence_Length(fargseq) : 0) + 2;
+	fargv = malloc(fargc * sizeof(char *)); 	
+	if (! fargv)
+		return(PyErr_NoMemory());
 
+	fargv[0] = PyString_AsString(PySequence_GetItem(PySys_GetObject("argv"), 0));
+	fargv[1] = mountpoint;
+
+	if (fargseq) {
+		for (i=0; i < PySequence_Length(fargseq); i++) {
+			PyObject *pa;
+	
+			pa = PySequence_GetItem(fargseq, i);
+			if (! PyString_Check(pa)) {
+				PyErr_SetString(PyExc_TypeError,
+			                        "fuse argument is not a string");
+		                return(NULL);
+			}
+
+			fargv[i + 2] =  PyString_AsString(pa);
+		}
+	}
+
+	/*
+   	 * We don't use the mthp value, set below. We just pass it on so that
+   	 * the lib won't end up in dereferring a NULL pointer.
+   	 * (Later versions check for NULL, nevertheless we play safe.)
+   	 */
 #if FUSE_VERSION >= 26
-	fuse = fuse_new(chanfd, &fargs, &op, sizeof(op), NULL);
+	fuse = fuse_setup(fargc, fargv, &op, sizeof(op), &fmp, &mthp, NULL);
+#elif FUSE_VERSION >= 22
+	fuse = fuse_setup(fargc, fargv, &op, sizeof(op), &fmp, &mthp, &fd);
 #else
-	fuse = fuse_new(chanfd, &fargs, &op, sizeof(op));
+	fuse = __fuse_setup(fargc, fargv, &op, &fmp, &mthp, &fd);
 #endif
-#else /* FUSE_VERSION >= 25 */
-	chanfd = fuse_mount(mountpoint, kopts);
-#if FUSE_VERSION >= 22
-	fuse = fuse_new(chanfd, lopts, &op, sizeof(op));
-#else
-	fuse = fuse_new(chanfd, lopts, &op);
-#endif
-#endif /* FUSE_VERSION >= 25 */
+	free(fargv);
+	assert(strcmp(mountpoint, fmp) == 0);
+
+	if (fuse == NULL) {
+		PyErr_SetString(Py_FuseError, "filesystem initialization failed");
+
+		return (NULL);
+	}
+		 
 	if(multithreaded)
-		pyfuse_loop_mt(fuse);
+		err = pyfuse_loop_mt(fuse);
 	else
-		fuse_loop(fuse);
-
-#if FUSE_VERSION >= 25
-	fuse_opt_free_args(&fargs);
+		err = fuse_loop(fuse);
+	
+#if FUSE_VERSION >= 26
+	fuse_teardown(fuse, fmp);	
+#elif FUSE_VERSION >= 25
+	fuse_teardown(fuse, fd, fmp);	
+#elif FUSE_VERSION >= 22
+	fuse_teardown(fuse, fd, strdup(mountpoint));
+#else
+	__fuse_teardown(fuse, fd, strdup(mountpoint));
 #endif
-    //printf("Fuse_main: called\n");
+
+	if (err == -1) {
+		PyErr_SetString(Py_FuseError, "service loop failed");
+
+		return (NULL);
+	}		 
 
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -658,15 +678,16 @@ DL_EXPORT(void)
 init_fuse(void)
 {
 	PyObject *m, *d;
-	static PyObject *ErrorObject;
  
 	/* Create the module and add the functions */
 	m = Py_InitModule("_fuse", Fuse_methods);
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);
-	ErrorObject = PyErr_NewException("fuse.error", NULL, NULL);
-	PyDict_SetItemString(d, "error", ErrorObject);
+	Py_FuseError = PyErr_NewException("fuse.FuseError", NULL, NULL);
+	PyDict_SetItemString(d, "FuseError", Py_FuseError);
+	/* compat */
+	PyDict_SetItemString(d, "error", Py_FuseError);
 //	PyDict_SetItemString(d, "DEBUG", PyInt_FromLong(FUSE_DEBUG));
 }
 //@-node:DL_EXPORT

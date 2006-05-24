@@ -191,6 +191,13 @@ if __name__ == '__main__':
 
 	server = Xmp()
 	server.multithreaded = 1;
+	# pass on cmdline arguments to FUSE, ending up with the very crude
+	# syntax "xmp.py mp opt1 ...", ie. we can type things like
+	# "xmp.py /mnt/fuse debug max_read=4096"
+	# (This looks bad, but it's _not_ xmp.py who should properly parse the
+	# arguments, so we don't do anything more sophisticated here ATM.)
+	server.fuse_opt_list = server.optlist
+	server.fuse_opts = server.optdict
 	server.main()
 #@-node:mainline
 #@-others
