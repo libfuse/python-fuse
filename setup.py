@@ -15,22 +15,22 @@ ver = '0.1.1'
 
 # Find fuse compiler/linker flag via pkgconfig
 if os.system('pkg-config --exists fuse 2> /dev/null') == 0:
-  pkgcfg = os.popen('pkg-config --cflags fuse')
-  cflags = pkgcfg.readline().strip()
-  pkgcfg.close()
-  pkgcfg = os.popen('pkg-config --libs fuse')
-  libs = pkgcfg.readline().strip()
-  pkgcfg.close()
+    pkgcfg = os.popen('pkg-config --cflags fuse')
+    cflags = pkgcfg.readline().strip()
+    pkgcfg.close()
+    pkgcfg = os.popen('pkg-config --libs fuse')
+    libs = pkgcfg.readline().strip()
+    pkgcfg.close()
 
 else:
-  if os.system('pkg-config --usage 2> /dev/null') == 0:
-    print """pkg-config could not find fuse:
+    if os.system('pkg-config --usage 2> /dev/null') == 0:
+        print """pkg-config could not find fuse:
 you might need to adjust PKG_CONFIG_PATH or your 
 FUSE installation is very old (older than 2.1-pre1)"""
 
-  else:
-    print "pkg-config unavailable, build terminated"
-    sys.exit(1)
+    else:
+        print "pkg-config unavailable, build terminated"
+        sys.exit(1)
 
 # there must be an easier way to set up these flags!
 iflags = [x[2:] for x in cflags.split() if x[0:2] == '-I']

@@ -15,7 +15,7 @@ try:
                             )
 except:
     pass
- 
+
 from _fuse import main, FuseGetContext, FuseInvalidate, FuseError
 from string import join
 import sys
@@ -24,22 +24,22 @@ from errno import *
 class ErrnoWrapper:
 
     def __init__(self, func):
-    	self.func = func
+        self.func = func
 
     def __call__(self, *args, **kw):
-    	try:
-    		return apply(self.func, args, kw)
-    	except (IOError, OSError), detail:
-    		# Sometimes this is an int, sometimes an instance...
-    		if hasattr(detail, "errno"): detail = detail.errno
-    		return -detail
+        try:
+            return apply(self.func, args, kw)
+        except (IOError, OSError), detail:
+            # Sometimes this is an int, sometimes an instance...
+            if hasattr(detail, "errno"): detail = detail.errno
+            return -detail
 
 class Fuse:
 
     _attrs = ['getattr', 'readlink', 'getdir', 'mknod', 'mkdir',
-    	  'unlink', 'rmdir', 'symlink', 'rename', 'link', 'chmod',
-    	  'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
-          'statfs', 'fsync']
+              'unlink', 'rmdir', 'symlink', 'rename', 'link', 'chmod',
+              'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
+              'statfs', 'fsync']
     
     flags = 0
     multithreaded = 0
@@ -59,7 +59,7 @@ class Fuse:
             self.mountpoint = self.optlist[0]
         else:
             self.mountpoint = None
-       
+
         # This kind of forced commandline parsing still sucks,
         # but:
         #  - changing it would hurt compatibility
@@ -69,7 +69,7 @@ class Fuse:
         #    some args/opts based on a template and place
         #    that into a dict, and return the rest, so that
         #    can be passed to fuselib
- 
+
         # grab command-line arguments, if any.
         # Those will override whatever parameters
         # were passed to __init__ directly.
@@ -90,7 +90,7 @@ class Fuse:
                     self.optlist.append(o)
 
     def GetContext(self):
-	return FuseGetContext(self)
+        return FuseGetContext(self)
 
     def Invalidate(self, path):
         return FuseInvalidate(self, path)
@@ -101,17 +101,17 @@ class Fuse:
         d['multithreaded'] = self.multithreaded
 
         if not hasattr(self, 'fuse_opt_list'):
-                self.fuse_opt_list = []
+            self.fuse_opt_list = []
 
         # deprecated direct attributes for some fuse options
         for a in 'debug', 'allow_other', 'kernel_cache':
-                if hasattr(self, a):
-                        self.fuse_opt_list.append(a);
+            if hasattr(self, a):
+                self.fuse_opt_list.append(a);
 
         if not hasattr(self, 'fuse_opts'):
-                self.fuse_opts = {}
+            self.fuse_opts = {}
         for o in self.fuse_opt_list:
-                self.fuse_opts[o] = True
+            self.fuse_opts[o] = True
 
         nomount = False
         d['fuse_args'] = [] 
@@ -119,25 +119,25 @@ class Fuse:
         # (used as `-x' or `--foo', rather than `-o foo'):
         # we still prefer to have them as attributes
         for a in 'help', 'version':
-                if hasattr(self, 'show' + a):
-                        d['fuse_args'].append('--' + a)
-                        nomount = True
+            if hasattr(self, 'show' + a):
+                d['fuse_args'].append('--' + a)
+                nomount = True
         if hasattr(self, 'foreground'):
-                d['fuse_args'].append('-f')
+            d['fuse_args'].append('-f')
 
         opta = []
         for k in self.fuse_opts.keys():
-                if self.fuse_opts[k] == True:
-                        opta.append(str(k))
-                else:
-                        opta.append(str(k) + '=' + str(self.fuse_opts[k]))
+            if self.fuse_opts[k] == True:
+                opta.append(str(k))
+            else:
+                opta.append(str(k) + '=' + str(self.fuse_opts[k]))
 
-                d['fuse_args'].append("-o" + ",".join(opta)) 
+        d['fuse_args'].append("-o" + ",".join(opta)) 
 
-    	for a in self._attrs:
-    		if hasattr(self,a):
-    			d[a] = ErrnoWrapper(getattr(self, a))
+        for a in self._attrs:
+            if hasattr(self,a):
+                d[a] = ErrnoWrapper(getattr(self, a))
         try:
-    	     apply(main, (), d)
+            apply(main, (), d)
         except FuseError:
-             if not nomount: raise
+            if not nomount: raise

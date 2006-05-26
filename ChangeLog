@@ -1,5 +1,5 @@
 2006-05-24  Csaba Henk <csaba.henk@creo.hu>
-        * Revamp fs initialization code.
+	* Revamp fs initialization code.
 	   - Get rid of both of the kopts/lopts and the fuse_opt stuff,
 	     just keep opts in a dict and assemble a simple argc/argv pair
 	     from that. This means that for all supported API versions we can
@@ -7,39 +7,40 @@
 	     call sequence. This is much more clean and correct than the
 	     earlier approaches, and differenciating between APIs boils down
 	     to differenciating between the exact form of the above routines.
-           - Properly catch and propagate errors.
-           - Add crude support for fetching options from command line to xmp.py.
-        * Syntax cleanup:
-           - Strip leo markup. I'm not using leo and I find that markup somewhat
-             obtrusive. OTOH it seems to be auto-generated so my editions will
-             break it anyway.
+	   - Properly catch and propagate errors.
+	   - Add crude support for fetching options from command line to xmp.py.
+	* Syntax cleanup:
+	   - Strip leo markup. I'm not using leo and I find that markup somewhat
+	     obtrusive. OTOH it seems to be auto-generated so my editions will
+	     break it anyway.
+	   - Fix indetation, uniformize look.
 
 2006-05-23  Csaba Henk <csaba.henk@creo.hu>
-        * Fix statfs index mismatch in xmp.py.
-        * Rebase build system on pkg-config.
-           - Credits: setup.py based on that of south-python (python bindings to
-             icecast)
-        * Update code so that it can be compiled against FUSE libs with API from
-          21 to 26
-           - Credits: aggregated from contributions, code snippets and ideas of
-             Simon Barner, Csaba Henk, Roman Shterenzon and Miklos Szeredi
-        * Result of argument type check was ignored in FuseInvalidate(), fix
+	* Fix statfs index mismatch in xmp.py.
+	* Rebase build system on pkg-config.
+	   - Credits: setup.py based on that of south-python (python bindings to
+	     icecast)
+	* Update code so that it can be compiled against FUSE libs with API from
+	  21 to 26
+	   - Credits: aggregated from contributions, code snippets and ideas of
+	     Simon Barner, Csaba Henk, Roman Shterenzon and Miklos Szeredi
+	* Result of argument type check was ignored in FuseInvalidate(), fix
 	  it
 
 2006-02-03  Sebastien Delafond <sdelafond@gmx.net>
   
-        * Removed unnecessary "st->st_ino = 0" line in _fusemodule.c.
+	* Removed unnecessary "st->st_ino = 0" line in _fusemodule.c.
 	* Added __init__ argument handling in fuse.py. Command-line 
-          arguments still take precedence over contructor ones.
+	  arguments still take precedence over contructor ones.
 	* Removed unused os module from fuse.py.
-        * Changed  def read(self, path, length, offset) to 
-          def read(self, path, length, offset) so that len() can be
-          used inside read().
+	* Changed  def read(self, path, length, offset) to 
+	  def read(self, path, length, offset) so that len() can be
+	  used inside read().
 
 2005-04-07  Sebastien Delafond <sdelafond@gmx.net>
 
-        * Added support for statfs.f_bavail, so that df can correctly report
-	disk usage.
+	* Added support for statfs.f_bavail, so that df can correctly report
+	  disk usage.
 	
 2004-11-21  Sebastien Delafond <sdelafond@gmx.net>	
 
@@ -49,6 +50,5 @@
 2004-09-27  Miklos Szeredi <miklos@szeredi.hu>
 
 	* Applied patch by Steven James.  The Python binding in the CVS
-	version fell out of date and wouldn't compile. Fixed and added
-	FuseGetContext call.
-
+	  version fell out of date and wouldn't compile. Fixed and added
+	  FuseGetContext call.

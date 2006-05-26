@@ -39,16 +39,26 @@ static int debuglevel=0;
 
 static PyObject *Py_FuseError;
 
-#define PROLOGUE \
-int ret = -EINVAL; \
-if (!v) { PyErr_Print(); goto OUT; } \
-if(v == Py_None) { ret = 0; goto OUT_DECREF; } \
-if(PyInt_Check(v)) { ret = PyInt_AsLong(v); goto OUT_DECREF; }
+#define PROLOGUE		\
+int ret = -EINVAL;		\
+				\
+if (!v) {			\
+	PyErr_Print();		\
+	goto OUT;		\
+}				\
+if (v == Py_None) {		\
+	ret = 0;		\
+	goto OUT_DECREF;	\
+}				\
+if (PyInt_Check(v)) {		\
+	ret = PyInt_AsLong(v);	\
+	goto OUT_DECREF;	\
+}
 
-#define EPILOGUE \
-OUT_DECREF: \
-	Py_DECREF(v); \
-OUT: \
+#define EPILOGUE		\
+OUT_DECREF:			\
+	Py_DECREF(v);		\
+OUT:				\
 	return ret; 
 
 /* 
@@ -61,46 +71,58 @@ OUT: \
  * with both PyInt_Check and PyLong_Check.
  */
 
-static int getattr_func(const char *path, struct stat *st)
+static int
+getattr_func(const char *path, struct stat *st)
 {
-int i;
-PyObject *v = PyObject_CallFunction(getattr_cb, "s", path);
-PROLOGUE
+	int i;
+	PyObject *v = PyObject_CallFunction(getattr_cb, "s", path);
 
-if(!PySequence_Check(v)) { goto OUT_DECREF; }
-if(PySequence_Size(v) < 10) { goto OUT_DECREF; }
-for(i=0; i<10; i++)
-{
-    PyObject *tmp = PySequence_GetItem(v, i);
-	if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) goto OUT_DECREF;
+	PROLOGUE
+
+	if (!PySequence_Check(v))
+		goto OUT_DECREF;
+
+	if(PySequence_Size(v) < 10)
+		goto OUT_DECREF;
+
+	for(i=0; i<10; i++) {
+		PyObject *tmp = PySequence_GetItem(v, i);
+		if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))
+			goto OUT_DECREF;
+	}
+
+	st->st_mode  = PyInt_AsLong(PySequence_GetItem(v, 0));
+	st->st_ino   = PyInt_AsLong(PySequence_GetItem(v, 1));
+	st->st_dev   = PyInt_AsLong(PySequence_GetItem(v, 2));
+	st->st_nlink = PyInt_AsLong(PySequence_GetItem(v, 3));
+	st->st_uid   = PyInt_AsLong(PySequence_GetItem(v, 4));
+	st->st_gid   = PyInt_AsLong(PySequence_GetItem(v, 5));
+	st->st_size  = PyInt_AsLong(PySequence_GetItem(v, 6));
+	st->st_atime = PyInt_AsLong(PySequence_GetItem(v, 7));
+	st->st_mtime = PyInt_AsLong(PySequence_GetItem(v, 8));
+	st->st_ctime = PyInt_AsLong(PySequence_GetItem(v, 9));
+	
+	/* Fill in fields not provided by Python lstat() */
+	st->st_blksize= 4096;
+	st->st_blocks= (st->st_size + 511)/512;
+	
+	ret = 0;
+
+	EPILOGUE
 }
 
-st->st_mode = PyInt_AsLong(PySequence_GetItem(v, 0));
-st->st_ino  = PyInt_AsLong(PySequence_GetItem(v, 1));
-st->st_dev  = PyInt_AsLong(PySequence_GetItem(v, 2));
-st->st_nlink= PyInt_AsLong(PySequence_GetItem(v, 3));
-st->st_uid  = PyInt_AsLong(PySequence_GetItem(v, 4));
-st->st_gid  = PyInt_AsLong(PySequence_GetItem(v, 5));
-st->st_size = PyInt_AsLong(PySequence_GetItem(v, 6));
-st->st_atime= PyInt_AsLong(PySequence_GetItem(v, 7));
-st->st_mtime= PyInt_AsLong(PySequence_GetItem(v, 8));
-st->st_ctime= PyInt_AsLong(PySequence_GetItem(v, 9));
-
-/* Fill in fields not provided by Python lstat() */
-st->st_blksize= 4096;
-st->st_blocks= (st->st_size + 511)/512;
-
-ret = 0;
-EPILOGUE
-}
-
-static int readlink_func(const char *path, char *link, size_t size)
+static int
+readlink_func(const char *path, char *link, size_t size)
 {
 	PyObject *v = PyObject_CallFunction(readlink_cb, "s", path);
 	char *s;
+
 	PROLOGUE
 
-	if(!PyString_Check(v)) { ret = -EINVAL; goto OUT_DECREF; }
+	if(!PyString_Check(v)) {
+		 ret = -EINVAL;
+		goto OUT_DECREF;
+	}
 	s = PyString_AsString(v);
 	strncpy(link, s, size);
 	link[size-1] = '\0';
@@ -109,7 +131,8 @@ static int readlink_func(const char *path, char *link, size_t size)
 	EPILOGUE
 }
 
-static int getdir_add_entry(PyObject *w, fuse_dirh_t dh, fuse_dirfil_t df)
+static int
+getdir_add_entry(PyObject *w, fuse_dirh_t dh, fuse_dirfil_t df)
 {
 	PyObject *o0;
 	PyObject *o1;
@@ -149,10 +172,12 @@ out:
 	return ret;
 }
 
-static int getdir_func(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
+static int
+getdir_func(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
 {
 	PyObject *v = PyObject_CallFunction(getdir_cb, "s", path);
 	int i;
+
 	PROLOGUE
 
 	if(!PySequence_Check(v)) {
@@ -171,204 +196,236 @@ static int getdir_func(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
 	EPILOGUE
 }
 
-static int mknod_func(const char *path, mode_t m, dev_t d)
+static int
+mknod_func(const char *path, mode_t m, dev_t d)
 {
 	PyObject *v = PyObject_CallFunction(mknod_cb, "sii", path, m, d);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int mkdir_func(const char *path, mode_t m)
+static int
+mkdir_func(const char *path, mode_t m)
 {
 	PyObject *v = PyObject_CallFunction(mkdir_cb, "si", path, m);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int unlink_func(const char *path)
+static int
+unlink_func(const char *path)
 {
 	PyObject *v = PyObject_CallFunction(unlink_cb, "s", path);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int rmdir_func(const char *path)
+static int
+rmdir_func(const char *path)
 {
 	PyObject *v = PyObject_CallFunction(rmdir_cb, "s", path);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int symlink_func(const char *path, const char *path1)
+static int
+symlink_func(const char *path, const char *path1)
 {
 	PyObject *v = PyObject_CallFunction(symlink_cb, "ss", path, path1);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int rename_func(const char *path, const char *path1)
+static int
+rename_func(const char *path, const char *path1)
 {
 	PyObject *v = PyObject_CallFunction(rename_cb, "ss", path, path1);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int link_func(const char *path, const char *path1)
+static int
+link_func(const char *path, const char *path1)
 {
 	PyObject *v = PyObject_CallFunction(link_cb, "ss", path, path1);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int chmod_func(const char *path, mode_t m) 
+static int
+chmod_func(const char *path, mode_t m) 
 {
 	PyObject *v = PyObject_CallFunction(chmod_cb, "si", path, m);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int chown_func(const char *path, uid_t u, gid_t g) 
+static int
+chown_func(const char *path, uid_t u, gid_t g) 
 {
 	PyObject *v = PyObject_CallFunction(chown_cb, "sii", path, u, g);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int truncate_func(const char *path, off_t o)
+static int
+truncate_func(const char *path, off_t o)
 {
 	PyObject *v = PyObject_CallFunction(truncate_cb, "si", path, o);
+
 	PROLOGUE
 	EPILOGUE
 }
 
-static int utime_func(const char *path, struct utimbuf *u) {
+static int
+utime_func(const char *path, struct utimbuf *u)
+{
 	int actime = u ? u->actime : time(NULL);
 	int modtime = u ? u->modtime : actime;
 	PyObject *v = PyObject_CallFunction(utime_cb, "s(ii)",
-					path, actime, modtime);
+	                                    path, actime, modtime);
+
 	PROLOGUE
 	EPILOGUE
 }
 
 #if FUSE_VERSION >= 22
-static int read_func(const char *path, char *buf, size_t s, off_t off,
+static int
+read_func(const char *path, char *buf, size_t s, off_t off,
                      struct fuse_file_info *fi)
 #else
-static int read_func(const char *path, char *buf, size_t s, off_t off)
+static int
+read_func(const char *path, char *buf, size_t s, off_t off)
 #endif
 {
 	PyObject *v = PyObject_CallFunction(read_cb, "sii", path, s, off);
+
 	PROLOGUE
+
 	if(PyString_Check(v)) {
-		if(PyString_Size(v) > s) goto OUT_DECREF;
+		if(PyString_Size(v) > s)
+			goto OUT_DECREF;
 		memcpy(buf, PyString_AsString(v), PyString_Size(v));
 		ret = PyString_Size(v);
 	}
+
 	EPILOGUE
 }
 
 #if FUSE_VERSION >= 22
-static int write_func(const char *path, const char *buf, size_t t, off_t off,
-                      struct fuse_file_info *fi)
+static int
+write_func(const char *path, const char *buf, size_t t, off_t off,
+           struct fuse_file_info *fi)
 #else
-static int write_func(const char *path, const char *buf, size_t t, off_t off)
+static int
+write_func(const char *path, const char *buf, size_t t, off_t off)
 #endif
 {
 	PyObject *v = PyObject_CallFunction(write_cb,"ss#i", path, buf, t, off);
+
 	PROLOGUE
 	EPILOGUE
 }
 
 #if FUSE_VERSION >= 22
-static int open_func(const char *path, struct fuse_file_info *fi)
+static int
+open_func(const char *path, struct fuse_file_info *fi)
 {
 	PyObject *v = PyObject_CallFunction(open_cb, "si", path, fi->flags);
 #else
-static int open_func(const char *path, int mode)
+static int
+open_func(const char *path, int mode)
 {
 	PyObject *v = PyObject_CallFunction(open_cb, "si", path, mode);
 #endif
 	PROLOGUE
-    printf("open_func: path=%s\n", path);
+
 	EPILOGUE
 }
 
 #if FUSE_VERSION >= 22
-static int release_func(const char *path, struct fuse_file_info *fi)
+static int
+release_func(const char *path, struct fuse_file_info *fi)
 {
-  PyObject *v = PyObject_CallFunction(release_cb, "si", path, fi->flags);
+	PyObject *v = PyObject_CallFunction(release_cb, "si", path, fi->flags);
 #else
-static int release_func(const char *path, int flags)
+static int
+release_func(const char *path, int flags)
 {
-  PyObject *v = PyObject_CallFunction(release_cb, "si", path, flags);
+	PyObject *v = PyObject_CallFunction(release_cb, "si", path, flags);
 #endif
-  PROLOGUE
-    //printf("release_func: path=%s flags=%d\n", path, flags);
-  EPILOGUE
+	PROLOGUE
+
+	EPILOGUE
 }
 
 #if FUSE_VERSION >= 25
-static int statfs_func( const char *dummy, struct statvfs *fst)
+static int
+statfs_func(const char *dummy, struct statvfs *fst)
 #else
-static int statfs_func( const char *dummy, struct statfs *fst)
+static int
+statfs_func(const char *dummy, struct statfs *fst)
 #endif
 {
-  int i, seqs;
-  long retvalues[8];
-  PyObject *v = PyObject_CallFunction(statfs_cb, "");
-PROLOGUE
+	int i, seqs;
+	long retvalues[8];
+	PyObject *v = PyObject_CallFunction(statfs_cb, "");
 
-  if (!PySequence_Check(v))
-    { goto OUT_DECREF; }
- seqs = MIN(PySequence_Size(v),
-#if FUSE_VERSION >= 25
-            8
-#else
-            7
-#endif
-           );
- if (seqs < 7)
-   { goto OUT_DECREF; }
- for(i=0; i<seqs; i++)
-   {
-     PyObject *tmp = PySequence_GetItem(v, i);
-     retvalues[i] = PyInt_Check(tmp)
-       ? PyInt_AsLong(tmp)
-       : (PyLong_Check(tmp)
-          ? PyLong_AsLong(tmp)
-          : 0);
-   }
+	PROLOGUE
 
- fst->f_bsize	= retvalues[0];
- fst->f_blocks	= retvalues[1];
- fst->f_bfree	= retvalues[2];
- fst->f_bavail	= retvalues[3];
- fst->f_files	= retvalues[4];
- fst->f_ffree	= retvalues[5];
+	if (!PySequence_Check(v))
+		goto OUT_DECREF;
+
 #if FUSE_VERSION >= 25
- fst->f_namemax = retvalues[6];
- fst->f_frsize = retvalues[seqs >= 8 ? 7 : 0];
+	seqs = MIN(PySequence_Size(v), 8);
 #else
- fst->f_namelen	= retvalues[6];
+	seqs = MIN(PySequence_Size(v), 7);
 #endif
 
- ret = 0;
+	if (seqs < 7)
+		goto OUT_DECREF;
+
+	for(i=0; i<seqs; i++) {
+		PyObject *tmp = PySequence_GetItem(v, i);
+		retvalues[i] = PyInt_Check(tmp) ? PyInt_AsLong(tmp) :
+		                 (PyLong_Check(tmp) ? PyLong_AsLong(tmp) : 0);
+	}
+
+	fst->f_bsize	= retvalues[0];
+	fst->f_blocks	= retvalues[1];
+	fst->f_bfree	= retvalues[2];
+	fst->f_bavail	= retvalues[3];
+	fst->f_files	= retvalues[4];
+	fst->f_ffree	= retvalues[5];
+	#if FUSE_VERSION >= 25
+	fst->f_namemax = retvalues[6];
+	fst->f_frsize = retvalues[seqs >= 8 ? 7 : 0];
+	#else
+	fst->f_namelen	= retvalues[6];
+	#endif
+
+	ret = 0;
  
-#ifdef IGNORE_THIS
- printf("block_size=%ld, blocks=%ld, blocks_free=%ld, blocks_avail=%ld, files=%ld, files_free=%ld, namelen=%ld\n",
-        retvalues[0], retvalues[1], retvalues[2], retvalues[3], retvalues[4], retvalues[5], retvalues[6]);
-#endif
-
-EPILOGUE
-
+	EPILOGUE
 }
 
 #if FUSE_VERSION >= 22
-static int fsync_func(const char *path, int datasync, struct fuse_file_info *fi)
+static int
+fsync_func(const char *path, int datasync, struct fuse_file_info *fi)
 {
 	PyObject *v = PyObject_CallFunction(fsync_cb, "si", path, datasync);
 #else
-static int fsync_func(const char *path, int isfsyncfile)
+static int
+fsync_func(const char *path, int isfsyncfile)
 {
 	PyObject *v = PyObject_CallFunction(fsync_cb, "si", path, isfsyncfile);
 #endif
@@ -376,7 +433,8 @@ static int fsync_func(const char *path, int isfsyncfile)
 	EPILOGUE
 }
 
-static void process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
+static void
+process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
 {
 	PyInterpreterState *interp = (PyInterpreterState *) data;
 	PyThreadState *state;
@@ -395,7 +453,8 @@ static void process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
 	PyEval_ReleaseLock();
 }
 
-static int pyfuse_loop_mt(struct fuse *f)
+static int
+pyfuse_loop_mt(struct fuse *f)
 {
 	PyInterpreterState *interp;
 	PyThreadState *save;
@@ -475,12 +534,12 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 
 	if (fargseq && !PySequence_Check(fargseq)) {
 		PyErr_SetString(PyExc_TypeError, "fuse_args is not a sequence");
-                return(NULL);
+		return(NULL);
 	}
 
 	fargc = (fargseq ? PySequence_Length(fargseq) : 0) + 2;
 	fargv = malloc(fargc * sizeof(char *)); 	
-	if (! fargv)
+	if (!fargv)
 		return(PyErr_NoMemory());
 
 	fargv[0] = PyString_AsString(PySequence_GetItem(PySys_GetObject("argv"), 0));
@@ -491,7 +550,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 			PyObject *pa;
 	
 			pa = PySequence_GetItem(fargseq, i);
-			if (! PyString_Check(pa)) {
+			if (!PyString_Check(pa)) {
 				PyErr_SetString(PyExc_TypeError,
 			                        "fuse argument is not a string");
 		                return(NULL);
@@ -550,12 +609,14 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 static char FuseInvalidate__doc__[] =
 	"Tell Fuse kernel module to explicitly invalidate a cached inode's contents\n";
 
-static PyObject *FuseInvalidate( PyObject *self, PyObject *args) {
+static PyObject *
+FuseInvalidate(PyObject *self, PyObject *args)
+{
 	char *path;
 	PyObject *ret, *arg1;
 	int err;
 
-	if (! (arg1 = PyTuple_GetItem(args, 1)))
+	if (!(arg1 = PyTuple_GetItem(args, 1)))
 		return(NULL);
 
 	if(!PyString_Check(arg1)) {
@@ -576,7 +637,9 @@ static PyObject *FuseInvalidate( PyObject *self, PyObject *args) {
 static char FuseGetContext__doc__[] =
 	"Return the context of a filesystem operation in a dict. uid, gid, pid\n";
 
-static PyObject *FuseGetContext( PyObject *self, PyObject *args) {
+static PyObject *
+FuseGetContext(PyObject *self, PyObject *args)
+{
 	struct fuse_context *fc;
 	PyObject *ret;
 	PyObject *num;
@@ -587,17 +650,16 @@ static PyObject *FuseGetContext( PyObject *self, PyObject *args) {
 	if(!ret)
 		return(NULL);
 
-	num = PyInt_FromLong( fc->uid);
-	PyDict_SetItemString( ret, "uid", num);	
+	num = PyInt_FromLong(fc->uid);
+	PyDict_SetItemString(ret, "uid", num);	
 
-	num = PyInt_FromLong( fc->gid);
-	PyDict_SetItemString( ret, "gid", num);	
+	num = PyInt_FromLong(fc->gid);
+	PyDict_SetItemString(ret, "gid", num);	
 
-	num = PyInt_FromLong( fc->pid);
-	PyDict_SetItemString( ret, "pid", num);	
+	num = PyInt_FromLong(fc->pid);
+	PyDict_SetItemString(ret, "pid", num);	
 
 	return(ret);
-
 }
 
 static PyMethodDef Fuse_methods[] = {
@@ -624,5 +686,4 @@ init_fuse(void)
 	PyDict_SetItemString(d, "FuseError", Py_FuseError);
 	/* compat */
 	PyDict_SetItemString(d, "error", Py_FuseError);
-//	PyDict_SetItemString(d, "DEBUG", PyInt_FromLong(FUSE_DEBUG));
 }
