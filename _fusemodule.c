@@ -1,6 +1,3 @@
-//@+leo-ver=4
-//@+node:@file _fusemodule.c
-//@@language c
 /*
     Copyright (C) 2001  Jeff Epler  <jepler@unpythonic.dhs.org>
 
@@ -22,16 +19,13 @@
 #endif
 
 #define FUSE_USE_VERSION 26
-//@+others
-//@+node:includes
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <time.h>
 #include <Python.h>
 #include "fuse.h"
-//@-node:includes
-//@+node:globals
 
 static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *getdir_cb=NULL,
   *mknod_cb=NULL, *mkdir_cb=NULL, *unlink_cb=NULL, *rmdir_cb=NULL,
@@ -45,23 +39,17 @@ static int debuglevel=0;
 
 static PyObject *Py_FuseError;
 
-//@-node:globals
-//@+node:PROLOGUE
 #define PROLOGUE \
 int ret = -EINVAL; \
 if (!v) { PyErr_Print(); goto OUT; } \
 if(v == Py_None) { ret = 0; goto OUT_DECREF; } \
 if(PyInt_Check(v)) { ret = PyInt_AsLong(v); goto OUT_DECREF; }
 
-//@-node:PROLOGUE
-//@+node:EPILOGUE
 #define EPILOGUE \
 OUT_DECREF: \
 	Py_DECREF(v); \
 OUT: \
 	return ret; 
-//@-node:EPILOGUE
-//@+node:getattr_func
 
 /* 
  * Local Variables:
@@ -106,9 +94,6 @@ ret = 0;
 EPILOGUE
 }
 
-//@-node:getattr_func
-//@+node:readlink_func
-
 static int readlink_func(const char *path, char *link, size_t size)
 {
 	PyObject *v = PyObject_CallFunction(readlink_cb, "s", path);
@@ -123,8 +108,6 @@ static int readlink_func(const char *path, char *link, size_t size)
 
 	EPILOGUE
 }
-//@-node:readlink_func
-//@+node:getdir_add_entry
 
 static int getdir_add_entry(PyObject *w, fuse_dirh_t dh, fuse_dirfil_t df)
 {
@@ -165,8 +148,6 @@ out_decref:
 out:
 	return ret;
 }
-//@-node:getdir_add_entry
-//@+node:getdir_func
 
 static int getdir_func(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
 {
@@ -189,8 +170,6 @@ static int getdir_func(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
 
 	EPILOGUE
 }
-//@-node:getdir_func
-//@+node:mknod_func
 
 static int mknod_func(const char *path, mode_t m, dev_t d)
 {
@@ -198,8 +177,6 @@ static int mknod_func(const char *path, mode_t m, dev_t d)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:mknod_func
-//@+node:mkdir_func
 
 static int mkdir_func(const char *path, mode_t m)
 {
@@ -207,8 +184,6 @@ static int mkdir_func(const char *path, mode_t m)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:mkdir_func
-//@+node:unlink_func
 
 static int unlink_func(const char *path)
 {
@@ -216,8 +191,6 @@ static int unlink_func(const char *path)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:unlink_func
-//@+node:rmdir_func
 
 static int rmdir_func(const char *path)
 {
@@ -225,8 +198,6 @@ static int rmdir_func(const char *path)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:rmdir_func
-//@+node:symlink_func
 
 static int symlink_func(const char *path, const char *path1)
 {
@@ -234,8 +205,6 @@ static int symlink_func(const char *path, const char *path1)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:symlink_func
-//@+node:rename_func
 
 static int rename_func(const char *path, const char *path1)
 {
@@ -243,8 +212,6 @@ static int rename_func(const char *path, const char *path1)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:rename_func
-//@+node:link_func
 
 static int link_func(const char *path, const char *path1)
 {
@@ -252,8 +219,6 @@ static int link_func(const char *path, const char *path1)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:link_func
-//@+node:chmod_func
 
 static int chmod_func(const char *path, mode_t m) 
 {
@@ -261,8 +226,6 @@ static int chmod_func(const char *path, mode_t m)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:chmod_func
-//@+node:chown_func
 
 static int chown_func(const char *path, uid_t u, gid_t g) 
 {
@@ -270,8 +233,6 @@ static int chown_func(const char *path, uid_t u, gid_t g)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:chown_func
-//@+node:truncate_func
 
 static int truncate_func(const char *path, off_t o)
 {
@@ -279,8 +240,6 @@ static int truncate_func(const char *path, off_t o)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:truncate_func
-//@+node:utime_func
 
 static int utime_func(const char *path, struct utimbuf *u) {
 	int actime = u ? u->actime : time(NULL);
@@ -290,8 +249,6 @@ static int utime_func(const char *path, struct utimbuf *u) {
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:utime_func
-//@+node:read_func
 
 #if FUSE_VERSION >= 22
 static int read_func(const char *path, char *buf, size_t s, off_t off,
@@ -309,8 +266,6 @@ static int read_func(const char *path, char *buf, size_t s, off_t off)
 	}
 	EPILOGUE
 }
-//@-node:read_func
-//@+node:write_func
 
 #if FUSE_VERSION >= 22
 static int write_func(const char *path, const char *buf, size_t t, off_t off,
@@ -323,8 +278,6 @@ static int write_func(const char *path, const char *buf, size_t t, off_t off)
 	PROLOGUE
 	EPILOGUE
 }
-//@-node:write_func
-//@+node:open_func
 
 #if FUSE_VERSION >= 22
 static int open_func(const char *path, struct fuse_file_info *fi)
@@ -339,8 +292,7 @@ static int open_func(const char *path, int mode)
     printf("open_func: path=%s\n", path);
 	EPILOGUE
 }
-//@-node:open_func
-//@+node:release_func
+
 #if FUSE_VERSION >= 22
 static int release_func(const char *path, struct fuse_file_info *fi)
 {
@@ -354,8 +306,7 @@ static int release_func(const char *path, int flags)
     //printf("release_func: path=%s flags=%d\n", path, flags);
   EPILOGUE
 }
-//@-node:release_func
-//@+node:statfs_func
+
 #if FUSE_VERSION >= 25
 static int statfs_func( const char *dummy, struct statvfs *fst)
 #else
@@ -412,8 +363,6 @@ EPILOGUE
 
 }
 
-//@-node:statfs_func
-//@+node:fsync_func
 #if FUSE_VERSION >= 22
 static int fsync_func(const char *path, int datasync, struct fuse_file_info *fi)
 {
@@ -426,9 +375,6 @@ static int fsync_func(const char *path, int isfsyncfile)
 	PROLOGUE
 	EPILOGUE
 }
-
-//@-node:fsync_func
-//@+node:process_cmd
 
 static void process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
 {
@@ -448,8 +394,6 @@ static void process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
 	PyThreadState_Delete(state);
 	PyEval_ReleaseLock();
 }
-//@-node:process_cmd
-//@+node:pyfuse_loop_mt
 
 static int pyfuse_loop_mt(struct fuse *f)
 {
@@ -470,8 +414,6 @@ static int pyfuse_loop_mt(struct fuse *f)
 
 	return(err);
 }
-//@-node:pyfuse_loop_mt
-//@+node:Fuse_main
 
 static struct fuse *fuse=NULL;
 
@@ -604,13 +546,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	Py_INCREF(Py_None);
 	return Py_None;
 }
-//@-node:Fuse_main
-//@+node:DL_EXPORT
-//@+at 
-//@nonl
-// List of functions defined in the module
-//@-at
-//@@c
+
 static char FuseInvalidate__doc__[] =
 	"Tell Fuse kernel module to explicitly invalidate a cached inode's contents\n";
 
@@ -690,8 +626,3 @@ init_fuse(void)
 	PyDict_SetItemString(d, "error", Py_FuseError);
 //	PyDict_SetItemString(d, "DEBUG", PyInt_FromLong(FUSE_DEBUG));
 }
-//@-node:DL_EXPORT
-//@-others
-
-//@-node:@file _fusemodule.c
-//@-leo

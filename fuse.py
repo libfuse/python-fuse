@@ -1,5 +1,3 @@
-#@+leo-ver=4
-#@+node:@file fuse.py
 #
 #    Copyright (C) 2001  Jeff Epler  <jepler@unpythonic.dhs.org>
 #
@@ -8,9 +6,6 @@
 #
 
 
-#@@language python
-#@+others
-#@+node:imports
 # suppress version mismatch warnings
 try:
     import warnings
@@ -26,15 +21,11 @@ from string import join
 import sys
 from errno import *
 
-#@-node:imports
-#@+node:class ErrnoWrapper
 class ErrnoWrapper:
-    #@	@+others
-    #@+node:__init__
+
     def __init__(self, func):
     	self.func = func
-    #@-node:__init__
-    #@+node:__call__
+
     def __call__(self, *args, **kw):
     	try:
     		return apply(self.func, args, kw)
@@ -42,14 +33,9 @@ class ErrnoWrapper:
     		# Sometimes this is an int, sometimes an instance...
     		if hasattr(detail, "errno"): detail = detail.errno
     		return -detail
-    #@-node:__call__
-    #@-others
-#@-node:class ErrnoWrapper
-#@+node:class Fuse
+
 class Fuse:
 
-    #@	@+others
-    #@+node:attribs
     _attrs = ['getattr', 'readlink', 'getdir', 'mknod', 'mkdir',
     	  'unlink', 'rmdir', 'symlink', 'rename', 'link', 'chmod',
     	  'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
@@ -58,8 +44,6 @@ class Fuse:
     flags = 0
     multithreaded = 0
     
-    #@-node:attribs
-    #@+node:__init__
     def __init__(self, *args, **kw):
     
         # default attributes
@@ -111,8 +95,6 @@ class Fuse:
     def Invalidate(self, path):
         return FuseInvalidate(self, path)
 
-    #@-node:__init__
-    #@+node:main
     def main(self):
 
         d = {'mountpoint': self.mountpoint}
@@ -159,9 +141,3 @@ class Fuse:
     	     apply(main, (), d)
         except FuseError:
              if not nomount: raise
-    #@-node:main
-    #@-others
-#@-node:class Fuse
-#@-others
-#@-node:@file fuse.py
-#@-leo

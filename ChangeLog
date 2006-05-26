@@ -9,6 +9,10 @@
 	     to differenciating between the exact form of the above routines.
            - Properly catch and propagate errors.
            - Add crude support for fetching options from command line to xmp.py.
+        * Syntax cleanup:
+           - Strip leo markup. I'm not using leo and I find that markup somewhat
+             obtrusive. OTOH it seems to be auto-generated so my editions will
+             break it anyway.
 
 2006-05-23  Csaba Henk <csaba.henk@creo.hu>
         * Fix statfs index mismatch in xmp.py.
