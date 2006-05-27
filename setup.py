@@ -1,13 +1,14 @@
 # distutils build script
 # To install fuse-python, run 'python setup.py install'
 
-# This setup.py based on that of south-python (py bindings for icecast)
+# This setup.py based on that of shout-python (py bindings for libshout,
+# part of the icecast project, http://svn.xiph.org/icecast/trunk/shout-python)
 
 from distutils.core import setup, Extension
 import os
 import sys
 
-ver = '0.1.1'
+from _fusemeta import __version__ 
 
 # write default fuse.pc path into environment if PKG_CONFIG_PATH is unset
 #if not os.environ.has_key('PKG_CONFIG_PATH'):
@@ -42,7 +43,7 @@ libsonly = [x[2:] for x in libs.split() if x[0:2] == '-l']
 # libraries=[]
 # runtime_library_dirs=[]
 # extra_objects, extra_compile_args, extra_link_args
-fuse = Extension('_fusemodule', sources = ['_fusemodule.c'],
+fusemodule = Extension('_fusemodule', sources = ['_fusemodule.c'],
                   include_dirs = iflags,
                   extra_compile_args = extra_cflags,
                   library_dirs = libdirs,
@@ -50,11 +51,12 @@ fuse = Extension('_fusemodule', sources = ['_fusemodule.c'],
 
 # data_files = []
 setup (name = 'fuse-python',
-       version = ver,
+       version = __version__,
        description = 'Bindings for FUSE',
        url = 'http://fuse.sourceforge.net',
        author = 'Jeff Epler',
        author_email = 'jepler@unpythonic.dhs.org',
        maintainer = 'Csaba Henk',
        maintainer_email = 'csaba.henk@creo.hu',
-       ext_modules = [fuse])
+       ext_modules = [fusemodule],
+       py_modules=["fuse", "_fusemeta"])

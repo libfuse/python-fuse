@@ -16,6 +16,7 @@ try:
 except:
     pass
 
+from _fusemeta import __version__ 
 from _fuse import main, FuseGetContext, FuseInvalidate, FuseError
 from string import join
 import sys
