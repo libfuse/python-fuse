@@ -481,7 +481,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	int fd;
 #endif
 	int multithreaded=0, mthp;
-	PyObject *fargseq;
+	PyObject *fargseq = NULL;
 	int err;
 	int i;
 	char *fmp;
@@ -529,12 +529,12 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	DO_ONE_ATTR(statfs);
 	DO_ONE_ATTR(fsync);
 
-	if (fargseq && !PySequence_Check(fargseq)) {
-		PyErr_SetString(PyExc_TypeError, "fuse_args is not a sequence");
+	if (!fargseq || !PySequence_Check(fargseq) ||
+            (fargc = PySequence_Length(fargseq)) == 0) {
+		PyErr_SetString(PyExc_TypeError, "fuse_args is not a non-empty sequence");
 		return(NULL);
 	}
 
- 	fargc = fargseq ? PySequence_Length(fargseq) : 0;
  	fargv = malloc(fargc * sizeof(char *)); 	
 	if (!fargv)
 		return(PyErr_NoMemory());
