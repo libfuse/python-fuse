@@ -427,7 +427,7 @@ class Fuse(object):
     _attrs = ['getattr', 'readlink', 'getdir', 'mknod', 'mkdir',
               'unlink', 'rmdir', 'symlink', 'rename', 'link', 'chmod',
               'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
-              'statfs', 'fsync']
+              'statvfs', 'fsync']
 
     fusage = "%prog [mountpoint] [options]"
     
@@ -435,6 +435,35 @@ class Fuse(object):
  
         self.fuse_args = \
             kw.has_key('fuse_args') and kw.pop('fuse_args') or FuseArgs()
+
+        # Convert statfs to the new, Python statvfs compatible statvfs method
+        if not hasattr(self, 'statvfs') and hasattr(self, 'statfs'):
+            def statvfs(self):
+                import statvfs
+
+                if not compat_0_1:
+                    from warnings import warn
+                    warn("`statfs' fs method is deprecated, use `statvfs' instead",
+                         DeprecationWarning, stacklevel=1)
+
+                oout = self.statfs()
+                lo = len(oout)
+
+                nout = [0] * 10
+                nout[statvfs.F_BSIZE]   = oout[0]                   # 0
+                nout[statvfs.F_FRSIZE]  = oout[lo >= 8 and 7 or 0]  # 1 
+                nout[statvfs.F_BLOCKS]  = oout[1]                   # 2
+                nout[statvfs.F_BFREE]   = oout[2]                   # 3
+                nout[statvfs.F_BAVAIL]  = oout[3]                   # 4
+                nout[statvfs.F_FILES]   = oout[4]                   # 5
+                nout[statvfs.F_FFREE]   = oout[5]                   # 6
+                nout[statvfs.F_FAVAIL]  = lo >= 9 and oout[8] or 0  # 7
+                nout[statvfs.F_FLAG]    = lo >= 10 and oout[9] or 0 # 8
+                nout[statvfs.F_NAMEMAX] = oout[6]                   # 9
+
+                return nout 
+
+            self.__class__.statvfs = statvfs
 
         if compat_0_1: 
             return self.__init_0_1__(*args, **kw) 

@@ -123,26 +123,27 @@ class Xmp(Fuse):
         print "xmp.py:Xmp:release: %s %s" % (path, flags)
         return 0
 
-    def statfs(self):
+    def statvfs(self):
         """
-        Should return a tuple with the following 6 elements:
-            - blocksize - size of file blocks, in bytes
+        Should return a tuple like those returned by os.statvfs(). 
+
+        Feel free to set any of the above values to 0, which tells
+        the kernel that the info is not available.
+
+	However, to provide usable information (ie., you want sensible df(1)
+        output, you are suggested to specify at least the following 7 values
+        (in that order):
+
+            - blocksize - preferred size of file blocks, in bytes
+            - frsize - fundamental size of file blcoks, in bytes
+                [if you have no idea, use the same as blocksize]       
             - totalblocks - total number of blocks in the filesystem
             - freeblocks - number of free blocks
             - totalfiles - total number of file inodes
             - freefiles - nunber of free file inodes
-
-        Feel free to set any of the above values to 0, which tells
-        the kernel that the info is not available.
         """
-        print "xmp.py:Xmp:statfs: returning fictitious values"
-        blocks_size = 1024
-        blocks = 100000
-        blocks_free = 25000
-        files = 100000
-        files_free = 60000
-        namelen = 80
-        return (blocks_size, blocks, blocks - blocks_free, blocks_free, files, files_free, namelen)
+
+	return os.statvfs(self.root)
 
     def fsync(self, path, isfsyncfile):
         print "xmp.py:Xmp:fsync: path=%s, isfsyncfile=%s" % (self.root + path, isfsyncfile)

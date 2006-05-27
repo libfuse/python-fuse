@@ -104,3 +104,11 @@ This is what's addressed by the new API.
    partially parsed pieces of the FUSE command line to the C code, which
    used these directly in low level functions of the library, getting behind
    the main commandline parsing routine of the FUSE lib with no real reason.
+
+Anything else?
+--------------
+
+We deprecated the ``statfs()`` method (which was to return a tuple containing
+some fs characteristics, in a somewhat ad hoc order). Instead of that, you are
+suggested to implement ``statvfs()`` which is to return a tuple of the same
+layout as of ``os.statvfs()`` return values.

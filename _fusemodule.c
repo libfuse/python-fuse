@@ -374,42 +374,45 @@ static int
 statfs_func(const char *dummy, struct statfs *fst)
 #endif
 {
-	int i, seqs;
-	long retvalues[8];
+	int i;
+	long retvalues[10];
 	PyObject *v = PyObject_CallFunction(statfs_cb, "");
 
 	PROLOGUE
 
 	if (!PySequence_Check(v))
 		goto OUT_DECREF;
-
-#if FUSE_VERSION >= 25
-	seqs = MIN(PySequence_Size(v), 8);
-#else
-	seqs = MIN(PySequence_Size(v), 7);
-#endif
-
-	if (seqs < 7)
+	if (PySequence_Size(v) < 10)
 		goto OUT_DECREF;
 
-	for(i=0; i<seqs; i++) {
+	for(i = 0; i < 10; i++) {
 		PyObject *tmp = PySequence_GetItem(v, i);
 		retvalues[i] = PyInt_Check(tmp) ? PyInt_AsLong(tmp) :
 		                 (PyLong_Check(tmp) ? PyLong_AsLong(tmp) : 0);
 	}
 
+	/*
+	 * To be completely theoretically correct, we should identify
+	 * the indices via Python's statvfs module, but these indices
+	 * are unlikely to change, so we just use direct idexing.
+	 */
+
 	fst->f_bsize	= retvalues[0];
-	fst->f_blocks	= retvalues[1];
-	fst->f_bfree	= retvalues[2];
-	fst->f_bavail	= retvalues[3];
-	fst->f_files	= retvalues[4];
-	fst->f_ffree	= retvalues[5];
-	#if FUSE_VERSION >= 25
-	fst->f_namemax = retvalues[6];
-	fst->f_frsize = retvalues[seqs >= 8 ? 7 : 0];
-	#else
-	fst->f_namelen	= retvalues[6];
-	#endif
+#if FUSE_VERSION >= 25
+	fst->f_frsize   = retvalues[1];
+#endif
+	fst->f_blocks	= retvalues[2];
+	fst->f_bfree	= retvalues[3];
+	fst->f_bavail	= retvalues[4];
+	fst->f_files	= retvalues[5];
+	fst->f_ffree	= retvalues[6];
+#if FUSE_VERSION >= 25
+	fst->f_favail	= retvalues[7];
+	fst->f_flag     = retvalues[8];
+	fst->f_namemax  = retvalues[9];
+#else
+	fst->f_namelen	= retvalues[9];
+#endif
 
 	ret = 0;
  
@@ -493,7 +496,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"getattr", "readlink", "getdir", "mknod",
 		"mkdir", "unlink", "rmdir", "symlink", "rename",
 		"link", "chmod", "chown", "truncate", "utime",
-		"open", "read", "write", "release", "statfs", "fsync",
+		"open", "read", "write", "release", "statvfs", "fsync",
 		"fuse_args", "multithreaded", NULL};
 	
 	memset(&op, 0, sizeof(op));
