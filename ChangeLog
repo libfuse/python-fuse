@@ -4,6 +4,17 @@
 	   - fix typo in reference to shout-py  
 	   - define __version__ in a way so that it's visible both in
 	     fuse.py and setup.py
+	* NEW PYTHON API:
+	   - Python/C interface trimmed further: we pass down the opvector,
+	     the argument vector and the multithreaded flag, period.
+	   - Generate FUSE commandline from FuseArgs instance.
+	   - Add optparse based parsing API with support for extracting
+	     FUSE related options to a FuseArgs instance.
+	   - Update xmp.py to the new API, enhance it with a "-o root=PATH"
+	     option.
+	   - Add compat hooks (python variable, environment variable).
+	   - Document these changes in README.new_fusepy_api.
+	   - bump __version__ to 0.2pre1.
 
 2006-05-24  Csaba Henk <csaba.henk@creo.hu>
 	* Revamp fs initialization code.

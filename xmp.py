@@ -6,13 +6,13 @@
 #    See the file COPYING.
 #
 
-import os
+import os, sys
 from errno import *
 from stat import *
 try:
+    import fuse
     from fuse import Fuse
 except ImportError:
-    import sys
     print >> sys.stderr, """
 ! If you are trying the Python example filesystem from
 ! the fuse-python source directory, without installation,
@@ -21,9 +21,14 @@ except ImportError:
 """
     raise
 
+if not hasattr(fuse, '__version__'):
+    raise RuntimeError, \
+        "your fuse-py doesn't know of fuse.__version__, probably it's too old."
 
 import thread
 class Xmp(Fuse):
+
+    root = '/'
 
     def __init__(self, *args, **kw):
 
@@ -49,69 +54,67 @@ class Xmp(Fuse):
         #    time.sleep(120)
         #    print "mythread: ticking"
 
-    flags = 1
-
     def getattr(self, path):
-        return os.lstat(path)
+        return os.lstat(self.root + path)
 
     def readlink(self, path):
-        return os.readlink(path)
+        return os.readlink(self.root + path)
 
     def getdir(self, path):
-        return map(lambda x: (x,0), os.listdir(path))
+        return map(lambda x: (x,0), os.listdir(self.root + path))
 
     def unlink(self, path):
-        return os.unlink(path)
+        return os.unlink(self.root + path)
 
     def rmdir(self, path):
-        return os.rmdir(path)
+        return os.rmdir(self.root + path)
 
     def symlink(self, path, path1):
-        return os.symlink(path, path1)
+        return os.symlink(path, self.root + path1)
 
     def rename(self, path, path1):
-        return os.rename(path, path1)
+        return os.rename(self.root + path, self.root + path1)
 
     def link(self, path, path1):
-        return os.link(path, path1)
+        return os.link(self.root + path, self.root + path1)
 
     def chmod(self, path, mode):
-        return os.chmod(path, mode)
+        return os.chmod(self.root + path, mode)
 
     def chown(self, path, user, group):
-        return os.chown(path, user, group)
+        return os.chown(self.root + path, user, group)
 
     def truncate(self, path, size):
-        f = open(path, "w+")
+        f = open(self.root + path, "w+")
         return f.truncate(size)
 
     def mknod(self, path, mode, dev):
         """ Python has no os.mknod, so we can only do some things """
         if S_ISREG(mode):
-            open(path, "w")
+            open(self.root + path, "w")
         else:
             return -EINVAL
 
     def mkdir(self, path, mode):
-        return os.mkdir(path, mode)
+        return os.mkdir(self.root + path, mode)
 
     def utime(self, path, times):
-        return os.utime(path, times)
+        return os.utime(self.root + path, times)
 
     def open(self, path, flags):
         #print "xmp.py:Xmp:open: %s" % path
-        os.close(os.open(path, flags))
+        os.close(os.open(self.root + path, flags))
         return 0
 
     def read(self, path, length, offset):
         #print "xmp.py:Xmp:read: %s" % path
-        f = open(path, "r")
+        f = open(self.root + path, "r")
         f.seek(offset)
         return f.read(length)
 
     def write(self, path, buf, off):
         #print "xmp.py:Xmp:write: %s" % path
-        f = open(path, "r+")
+        f = open(self.root + path, "r+")
         f.seek(off)
         f.write(buf)
         return len(buf)
@@ -142,18 +145,28 @@ class Xmp(Fuse):
         return (blocks_size, blocks, blocks - blocks_free, blocks_free, files, files_free, namelen)
 
     def fsync(self, path, isfsyncfile):
-        print "xmp.py:Xmp:fsync: path=%s, isfsyncfile=%s" % (path, isfsyncfile)
+        print "xmp.py:Xmp:fsync: path=%s, isfsyncfile=%s" % (self.root + path, isfsyncfile)
         return 0
 
 if __name__ == '__main__':
 
-    server = Xmp()
-    server.multithreaded = 1;
-    # pass on cmdline arguments to FUSE, ending up with the very crude
-    # syntax "xmp.py mp opt1 ...", ie. we can type things like
-    # "xmp.py /mnt/fuse debug max_read=4096"
-    # (This looks bad, but it's _not_ xmp.py who should properly parse the
-    # arguments, so we don't do anything more sophisticated here ATM.)
-    server.fuse_opt_list = server.optlist
-    server.fuse_opts = server.optdict
+    usage="""
+Userspace nullfs-alike: mirror the filesystem tree from some point on.
+
+""" + Fuse.fusage
+
+    server = Xmp(version="%prog " + fuse.__version__,
+                 usage=usage),
+                 dash_s_do='setsingle')
+
+    server.parser.add_option(mountopt="root", metavar="PATH", default='/', type=str,
+                             help="mirror filesystem from under PATH [default: %default]")
+    server.parse(values=server, errex=1)
+
+    try:
+        os.stat(server.root)
+    except OSError:
+        print >> sys.stderr, "can't stat root of underlying filesystem"
+        sys.exit(1)
+     
     server.main()

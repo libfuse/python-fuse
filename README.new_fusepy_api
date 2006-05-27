@@ -1,0 +1,106 @@
+FUSE-Python bindings new API
+============================
+
+I've made several changes on the FUSE Python interface as we knew it.
+Let's see how it effects the usage of the module -- both from the end
+user and the developer POV.
+
+.. contents::
+
+Enforcing compatibility
+-----------------------
+
+There are lot of existing Python based FUSE based filesystems out there.
+They won't work with the current fuse-py code as is; however, we'd like
+to keep on using them. What can we do?
+
+Easy it is: just set ``fuse.compat_0_1`` to ``True`` before you invoke
+your filesystem. This can be achieved externally too, by setting the
+``FUSE_PYTHON_COMPAT`` environment variable to ``0.1``.
+
+What's incompatible, anyway?
+----------------------------
+
+We don't set FUSE library parameters via direct instance attributes of
+``Fuse``.  We got rid of ``Fuse#mountpoint``, ``Fuse#debug``,
+``Fuse#allow_other`` and ``Fuse#keep_cache``. [#]_
+
+All these characteristics are kept in a ``FuseArgs`` instance. That is,
+if you wanna set the mountpoint, do like
+``aFuse.fuse_args.mountpoint = mp``; if you want the ``keep_cache``
+property, do like ``aFuse.fuse_args.add('keep_cache')``.
+
+Specifying the mountpoint as an argument of the ``Fuse`` constructor
+will not work.  The simplistic parsing routine which we had in
+``Fuse#__init__()`` is no longer there. So when you instantiate
+``Fuse``, you get an instance with no mountpoint set. The
+``Fuse#optlist`` and ``Fuse#optdict`` attributes will neither be set.
+
+If you rely on these constructs, then one way of updating the code to
+the new API is to reimplement the aforementioned simplistic parsing
+routine (that's a short piece of code). However, you are encouraged to
+switch to the new parsing interface, which serves you with easy but
+powerful commandline parsing.
+
+.. [#] We follow the convention that we refer to instance attributes like
+   ``Klass#attr``. If it's a method, we'll use ``Klass#meth()``.
+
+What's on the gain side?
+------------------------
+
+There are two command lines in the game. One is the actual command line
+which you have to deal with, the other is the FUSE command line: FUSE is
+a command line driven library, the basic parameter for initializing the
+library (apart from the method list) is an ``(argc, argv)`` pair.
+
+This makes the library user to want urgently:
+
+- A way to easily generate a FUSE compatible command line from an abstract
+  spec.
+
+- A way to easily extract such an abstract spec from the actual command line.
+
+(... and these two procedures should interfere only via the spec.)
+
+This is what's addressed by the new API.
+
+- Now it's the Python code's duty to put together a complete FUSE command line
+  (in the form of a Python sequence). [#]_
+
+- ``FuseArgs`` is the class for the abstract specification:
+  the ``FuseArgs#mountpoint``, ``FuseArgs#set_mod()``, and ``FuseArgs#add()``
+  attributes/methods enable you to set up such a beast; ``FuseArgs#assemble()``
+  dumps a complete FUSE command line.
+
+- ``Fuse`` got a ``parser`` attribute. It's an instance of ``FuseOptParse``,
+  which is derived from the ``OptionParser`` class of optparse_.
+
+  * ``FuseOptParse`` groks a new kind of option (a subclass of
+    ``Option``), which has no short or long opts; it matches or not based on
+    its ``mountopt`` attribute, which is looked for among the comma-separated
+    members of a ``-o`` option.
+
+  * instead of a ``(values, restargs)`` tuple, ``#parse_args`` returns with a
+    ``(values, restargs, fuse_args)`` triplet. The third member is an instance
+    of ``FuseArgs``, and it's filled with all those mount options which didn't
+    match any of your ``mountopt``-ish option specs (and with some other mount
+    related info, such as the mountpoint).
+
+- Calling ``Fuse#parse`` performs the parsing, and makes a note of the resulting
+  ``FuseArgs`` instance. When you invoke ``Fuse#main``, the FUSE command line
+  will be inferred from this instance.
+
+- See *xmp.py* for a simple demonstration of all of this.  
+  
+- Bonus: the ``Fuse.fuseoptref()``, ``FuseArgs#filter()`` functions give you
+  diagnostic tools for validating ``FuseArgs`` instances against the
+  capability of the underlying FUSE library (albeit probably you don't
+  want to use these, usually it's good enough if the library complains
+  if it gets something inappropriate).
+
+.. _optparse: http://docs.python.org/lib/module-optparse.html
+
+.. [#] It wasn't like so: in earlier versions, Python passed down several
+   partially parsed pieces of the FUSE command line to the C code, which
+   used these directly in low level functions of the library, getting behind
+   the main commandline parsing routine of the FUSE lib with no real reason.

@@ -35,8 +35,6 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *getdir_cb=NULL,
   *statfs_cb=NULL, *fsync_cb=NULL
   ;
 
-static int debuglevel=0;
-
 static PyObject *Py_FuseError;
 
 #define PROLOGUE		\
@@ -483,7 +481,6 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	int fd;
 #endif
 	int multithreaded=0, mthp;
-	char *mountpoint;
 	PyObject *fargseq;
 	int err;
 	int i;
@@ -497,16 +494,16 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"mkdir", "unlink", "rmdir", "symlink", "rename",
 		"link", "chmod", "chown", "truncate", "utime",
 		"open", "read", "write", "release", "statfs", "fsync",
-		"fuse_args", "mountpoint", "multithreaded", "debug", NULL};
+		"fuse_args", "multithreaded", NULL};
 	
 	memset(&op, 0, sizeof(op));
 
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "|OOOOOOOOOOOOOOOOOOOOOsii", 
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "|OOOOOOOOOOOOOOOOOOOOOi", 
 					kwlist, &getattr_cb, &readlink_cb, &getdir_cb, &mknod_cb,
 					&mkdir_cb, &unlink_cb, &rmdir_cb, &symlink_cb, &rename_cb,
 					&link_cb, &chmod_cb, &chown_cb, &truncate_cb, &utime_cb,
 					&open_cb, &read_cb, &write_cb, &release_cb, &statfs_cb, &fsync_cb,
-					&fargseq, &mountpoint, &multithreaded, &debuglevel))
+					&fargseq, &multithreaded))
 		return NULL;
 
 #define DO_ONE_ATTR(name) if(name ## _cb) { Py_INCREF(name ## _cb); op.name = name ## _func; } else { op.name = NULL; }
@@ -537,16 +534,13 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		return(NULL);
 	}
 
-	fargc = (fargseq ? PySequence_Length(fargseq) : 0) + 2;
-	fargv = malloc(fargc * sizeof(char *)); 	
+ 	fargc = fargseq ? PySequence_Length(fargseq) : 0;
+ 	fargv = malloc(fargc * sizeof(char *)); 	
 	if (!fargv)
 		return(PyErr_NoMemory());
 
-	fargv[0] = PyString_AsString(PySequence_GetItem(PySys_GetObject("argv"), 0));
-	fargv[1] = mountpoint;
-
 	if (fargseq) {
-		for (i=0; i < PySequence_Length(fargseq); i++) {
+		for (i=0; i < fargc; i++) {
 			PyObject *pa;
 	
 			pa = PySequence_GetItem(fargseq, i);
@@ -556,7 +550,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		                return(NULL);
 			}
 
-			fargv[i + 2] =  PyString_AsString(pa);
+			fargv[i] =  PyString_AsString(pa);
 		}
 	}
 
@@ -573,7 +567,6 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	fuse = __fuse_setup(fargc, fargv, &op, &fmp, &mthp, &fd);
 #endif
 	free(fargv);
-	assert(strcmp(mountpoint, fmp) == 0);
 
 	if (fuse == NULL) {
 		PyErr_SetString(Py_FuseError, "filesystem initialization failed");
@@ -588,12 +581,10 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	
 #if FUSE_VERSION >= 26
 	fuse_teardown(fuse, fmp);	
-#elif FUSE_VERSION >= 25
-	fuse_teardown(fuse, fd, fmp);	
 #elif FUSE_VERSION >= 22
-	fuse_teardown(fuse, fd, strdup(mountpoint));
+	fuse_teardown(fuse, fd, fmp);
 #else
-	__fuse_teardown(fuse, fd, strdup(mountpoint));
+	__fuse_teardown(fuse, fd, fmp);
 #endif
 
 	if (err == -1) {
