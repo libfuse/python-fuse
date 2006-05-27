@@ -156,7 +156,7 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
 """ + Fuse.fusage
 
     server = Xmp(version="%prog " + fuse.__version__,
-                 usage=usage),
+                 usage=usage,
                  dash_s_do='setsingle')
 
     server.parser.add_option(mountopt="root", metavar="PATH", default='/', type=str,
