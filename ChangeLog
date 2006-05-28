@@ -1,3 +1,9 @@
+2006-05-28  Csaba Henk <csaba.henk@creo.hu>
+        * Switch getattr / statfs to an object oriented interface:
+	   - Revert the addition of the statvfs method.
+	   - Implement compat conversion for old getattr / statfs
+	     results.
+
 2006-05-27  Csaba Henk <csaba.henk@creo.hu>
 	* setup.py related fixes:
 	   - fix missing installation of fuse.py
@@ -19,7 +25,7 @@
              deprecated, keep statfs useable via statfs -> statvfs conversion
 
 2006-05-24  Csaba Henk <csaba.henk@creo.hu>
-	* Revamp fs initialization code.
+	* Revamp fs initialization code:
 	   - Get rid of both of the kopts/lopts and the fuse_opt stuff,
 	     just keep opts in a dict and assemble a simple argc/argv pair
 	     from that. This means that for all supported API versions we can
@@ -36,12 +42,12 @@
 	   - Fix indetation, uniformize look.
 
 2006-05-23  Csaba Henk <csaba.henk@creo.hu>
-	* Fix statfs index mismatch in xmp.py.
-	* Rebase build system on pkg-config.
+	* Fix statfs index mismatch in xmp.py:
+	* Rebase build system on pkg-config:
 	   - Credits: setup.py based on that of shout-python (python bindings to
 	     libshout, part of the icecast project)
 	* Update code so that it can be compiled against FUSE libs with API from
-	  21 to 26
+	  21 to 26:
 	   - Credits: aggregated from contributions, code snippets and ideas of
 	     Simon Barner, Csaba Henk, Roman Shterenzon and Miklos Szeredi
 	* Result of argument type check was ignored in FuseInvalidate(), fix

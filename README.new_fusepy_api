@@ -42,8 +42,33 @@ routine (that's a short piece of code). However, you are encouraged to
 switch to the new parsing interface, which serves you with easy but
 powerful commandline parsing.
 
+We also changed the ``getattr`` and ``statfs`` fs methods.
+We switched to an object oriented interface. Instead of returning a
+sequence, you have to return an object with appropriate attributes 
+(if any of them is lacking, the fs user will get an ``EINVAL``).
+For ``getattr``, the attributes are just like those of the return
+value of ``os.stat()``: ``st_mode``, ``st_ino``, ... For ``statfs``,
+the attributes are just like those of the return value of ``os.statvfs()``:
+``f_bsize``, ``f_frsize``, ... [#]_
+
+If you start from scratch (ie., you are not passing on an ``os.stat()`` or
+``os.statvfs()`` result), you can use the auxiliary classes ``fuse.Stat`` and
+``fuse.StatVFS`` for instantiating appropriate objects.  For ``fuse.Stat``, you
+have to define each of these attributes, for ``fuse.StatVfs`` they are initated
+with a 0 default value [#]_.
+
+.. _statvfs: http://docs.python.org/lib/module-statvfs.html
+
 .. [#] We follow the convention that we refer to instance attributes like
    ``Klass#attr``. If it's a method, we'll use ``Klass#meth()``.
+
+.. [#] Traditionally, ``os.stat()`` and ``os.statvfs()`` returned tuples.
+   Since Python 2.2, they return dedicated object which both implement the
+   sequence protocol and have the aforementioned attributes (when you print
+   them, they look like a tuple).
+
+.. [#] We might go stricter and leave some of the ``statfs`` attributes
+   undef'd.
 
 What's on the gain side?
 ------------------------
@@ -104,11 +129,3 @@ This is what's addressed by the new API.
    partially parsed pieces of the FUSE command line to the C code, which
    used these directly in low level functions of the library, getting behind
    the main commandline parsing routine of the FUSE lib with no real reason.
-
-Anything else?
---------------
-
-We deprecated the ``statfs()`` method (which was to return a tuple containing
-some fs characteristics, in a somewhat ad hoc order). Instead of that, you are
-suggested to implement ``statvfs()`` which is to return a tuple of the same
-layout as of ``os.statvfs()`` return values.

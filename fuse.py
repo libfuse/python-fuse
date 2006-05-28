@@ -405,7 +405,7 @@ class FuseOptParse(OptionParser):
 ##########
 
 
-class ErrnoWrapper:
+class ErrnoWrapper(object):
 
     def __init__(self, func):
         self.func = func
@@ -419,6 +419,35 @@ class ErrnoWrapper:
             return -detail
 
 
+class Stat(object):
+    """
+    Auxiliary class which can be filled up stat attributes.
+    The attributes are undefined by default.
+    """
+
+    pass
+
+
+class StatVfs(object):
+    """
+    Auxiliary class which can be filled up statvfs attributes.
+    The attributes are 0 by default.
+    """
+
+    def __init__(self):
+
+	self.f_bsize = 0
+	self.f_frsize = 0
+	self.f_blocks = 0
+	self.f_bfree = 0
+	self.f_bavail = 0
+	self.f_files = 0
+	self.f_ffree = 0
+	self.f_favail = 0
+	self.f_flag = 0
+	self.f_namemax = 0
+
+
 class Fuse(object):
     """
     Python interface to FUSE.
@@ -427,7 +456,7 @@ class Fuse(object):
     _attrs = ['getattr', 'readlink', 'getdir', 'mknod', 'mkdir',
               'unlink', 'rmdir', 'symlink', 'rename', 'link', 'chmod',
               'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
-              'statvfs', 'fsync']
+              'statfs', 'fsync']
 
     fusage = "%prog [mountpoint] [options]"
     
@@ -435,35 +464,6 @@ class Fuse(object):
  
         self.fuse_args = \
             kw.has_key('fuse_args') and kw.pop('fuse_args') or FuseArgs()
-
-        # Convert statfs to the new, Python statvfs compatible statvfs method
-        if not hasattr(self, 'statvfs') and hasattr(self, 'statfs'):
-            def statvfs(self):
-                import statvfs
-
-                if not compat_0_1:
-                    from warnings import warn
-                    warn("`statfs' fs method is deprecated, use `statvfs' instead",
-                         DeprecationWarning, stacklevel=1)
-
-                oout = self.statfs()
-                lo = len(oout)
-
-                nout = [0] * 10
-                nout[statvfs.F_BSIZE]   = oout[0]                   # 0
-                nout[statvfs.F_FRSIZE]  = oout[lo >= 8 and 7 or 0]  # 1 
-                nout[statvfs.F_BLOCKS]  = oout[1]                   # 2
-                nout[statvfs.F_BFREE]   = oout[2]                   # 3
-                nout[statvfs.F_BAVAIL]  = oout[3]                   # 4
-                nout[statvfs.F_FILES]   = oout[4]                   # 5
-                nout[statvfs.F_FFREE]   = oout[5]                   # 6
-                nout[statvfs.F_FAVAIL]  = lo >= 9 and oout[8] or 0  # 7
-                nout[statvfs.F_FLAG]    = lo >= 10 and oout[9] or 0 # 8
-                nout[statvfs.F_NAMEMAX] = oout[6]                   # 9
-
-                return nout 
-
-            self.__class__.statvfs = statvfs
 
         if compat_0_1: 
             return self.__init_0_1__(*args, **kw) 
@@ -506,7 +506,11 @@ class Fuse(object):
 
         for a in self._attrs:
             if hasattr(self,a):
-                d[a] = ErrnoWrapper(getattr(self, a))
+                b = a
+                if compat_0_1:
+                    if self.compatmap.has_key(a):
+                        b = self.compatmap[a]
+                d[a] = ErrnoWrapper(getattr(self, b))
 
         domount = True
         if not args:
@@ -614,8 +618,34 @@ class Fuse(object):
         if hasattr(self, 'debug'):
             self.fuse_args.add('debug')
  
-        if hasattr(self,'allow_other'):
+        if hasattr(self, 'allow_other'):
             self.fuse_args.add('allow_other')
  
-        if hasattr(self,'kernel_cache'):
+        if hasattr(self, 'kernel_cache'):
             self.fuse_args.add('kernel_cache')
+
+    def tuple2stat(self, *a):
+        from os import stat_result
+
+        return stat_result(self.getattr(*a))
+
+    def statfs2statvfs(self, *a):
+
+        oout = self.statfs(*a)
+        lo = len(oout)
+
+        svf = StatVfs() 
+        svf.f_bsize   = oout[0]                   # 0
+        svf.f_frsize  = oout[lo >= 8 and 7 or 0]  # 1 
+        svf.f_blocks  = oout[1]                   # 2
+        svf.f_bfree   = oout[2]                   # 3
+        svf.f_bavail  = oout[3]                   # 4
+        svf.f_files   = oout[4]                   # 5
+        svf.f_ffree   = oout[5]                   # 6
+        svf.f_favail  = lo >= 9 and oout[8] or 0  # 7
+        svf.f_flag    = lo >= 10 and oout[9] or 0 # 8
+        svf.f_namemax = oout[6]                   # 9
+
+        return svf
+
+    compatmap = { 'getattr' : 'tuple2stat', 'statfs' : 'statfs2statvfs' }

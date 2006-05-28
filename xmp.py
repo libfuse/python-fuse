@@ -123,24 +123,23 @@ class Xmp(Fuse):
         print "xmp.py:Xmp:release: %s %s" % (path, flags)
         return 0
 
-    def statvfs(self):
+    def statfs(self):
         """
-        Should return a tuple like those returned by os.statvfs(). 
+        Should return an object with statvfs attributes (f_bsize, f_frsize...).
+        Eg., the return value of os.statvfs() is such a thing (since py 2.2).
+        If you are not reusing an existing statvfs object, start with
+        fuse.StatVFS(), and define the attributes.
 
-        Feel free to set any of the above values to 0, which tells
-        the kernel that the info is not available.
+	To provide usable information (ie., you want sensible df(1)
+        output, you are suggested to specify the following attributes:
 
-	However, to provide usable information (ie., you want sensible df(1)
-        output, you are suggested to specify at least the following 7 values
-        (in that order):
-
-            - blocksize - preferred size of file blocks, in bytes
-            - frsize - fundamental size of file blcoks, in bytes
+            - f_bsize - preferred size of file blocks, in bytes
+            - f_frsize - fundamental size of file blcoks, in bytes
                 [if you have no idea, use the same as blocksize]       
-            - totalblocks - total number of blocks in the filesystem
-            - freeblocks - number of free blocks
-            - totalfiles - total number of file inodes
-            - freefiles - nunber of free file inodes
+            - f_blocks - total number of blocks in the filesystem
+            - f_bfree - number of free blocks
+            - f_files - total number of file inodes
+            - f_ffree - nunber of free file inodes
         """
 
 	return os.statvfs(self.root)

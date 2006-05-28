@@ -72,34 +72,31 @@ OUT:				\
 static int
 getattr_func(const char *path, struct stat *st)
 {
-	int i;
+	PyObject *tmp;
 	PyObject *v = PyObject_CallFunction(getattr_cb, "s", path);
 
 	PROLOGUE
 
-	if (!PySequence_Check(v))
-		goto OUT_DECREF;
+#define fetchattr(st, attr)				\
+	if (!(tmp = PyObject_GetAttrString(v, #attr)))	\
+		goto OUT_DECREF;			\
+	if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))	\
+		goto OUT_DECREF;			\
+	st->attr =  PyInt_AsLong(tmp);
 
-	if(PySequence_Size(v) < 10)
-		goto OUT_DECREF;
-
-	for(i=0; i<10; i++) {
-		PyObject *tmp = PySequence_GetItem(v, i);
-		if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))
-			goto OUT_DECREF;
-	}
-
-	st->st_mode  = PyInt_AsLong(PySequence_GetItem(v, 0));
-	st->st_ino   = PyInt_AsLong(PySequence_GetItem(v, 1));
-	st->st_dev   = PyInt_AsLong(PySequence_GetItem(v, 2));
-	st->st_nlink = PyInt_AsLong(PySequence_GetItem(v, 3));
-	st->st_uid   = PyInt_AsLong(PySequence_GetItem(v, 4));
-	st->st_gid   = PyInt_AsLong(PySequence_GetItem(v, 5));
-	st->st_size  = PyInt_AsLong(PySequence_GetItem(v, 6));
-	st->st_atime = PyInt_AsLong(PySequence_GetItem(v, 7));
-	st->st_mtime = PyInt_AsLong(PySequence_GetItem(v, 8));
-	st->st_ctime = PyInt_AsLong(PySequence_GetItem(v, 9));
+	fetchattr(st, st_mode);
+	fetchattr(st, st_ino);
+	fetchattr(st, st_dev);
+	fetchattr(st, st_nlink);
+	fetchattr(st, st_uid);
+	fetchattr(st, st_gid);
+	fetchattr(st, st_size);
+	fetchattr(st, st_atime);
+	fetchattr(st, st_mtime);
+	fetchattr(st, st_ctime);
 	
+#undef fetchattr
+
 	/* Fill in fields not provided by Python lstat() */
 	st->st_blksize= 4096;
 	st->st_blocks= (st->st_size + 511)/512;
@@ -118,7 +115,7 @@ readlink_func(const char *path, char *link, size_t size)
 	PROLOGUE
 
 	if(!PyString_Check(v)) {
-		 ret = -EINVAL;
+		ret = -EINVAL;
 		goto OUT_DECREF;
 	}
 	s = PyString_AsString(v);
@@ -374,45 +371,38 @@ static int
 statfs_func(const char *dummy, struct statfs *fst)
 #endif
 {
-	int i;
-	long retvalues[10];
+	PyObject *tmp;
 	PyObject *v = PyObject_CallFunction(statfs_cb, "");
 
 	PROLOGUE
 
-	if (!PySequence_Check(v))
-		goto OUT_DECREF;
-	if (PySequence_Size(v) < 10)
-		goto OUT_DECREF;
+#define fetchattr(st, attr)						\
+	if (!(tmp = PyObject_GetAttrString(v, #attr)))			\
+		goto OUT_DECREF;					\
+	if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))			\
+		goto OUT_DECREF;					\
+	st->attr =  PyInt_Check(tmp) ? PyInt_AsLong(tmp) :		\
+		      (PyLong_Check(tmp) ? PyLong_AsLong(tmp) : 0);
 
-	for(i = 0; i < 10; i++) {
-		PyObject *tmp = PySequence_GetItem(v, i);
-		retvalues[i] = PyInt_Check(tmp) ? PyInt_AsLong(tmp) :
-		                 (PyLong_Check(tmp) ? PyLong_AsLong(tmp) : 0);
-	}
 
-	/*
-	 * To be completely theoretically correct, we should identify
-	 * the indices via Python's statvfs module, but these indices
-	 * are unlikely to change, so we just use direct idexing.
-	 */
-
-	fst->f_bsize	= retvalues[0];
+	fetchattr(fst, f_bsize);
 #if FUSE_VERSION >= 25
-	fst->f_frsize   = retvalues[1];
+	fetchattr(fst, f_frsize);
 #endif
-	fst->f_blocks	= retvalues[2];
-	fst->f_bfree	= retvalues[3];
-	fst->f_bavail	= retvalues[4];
-	fst->f_files	= retvalues[5];
-	fst->f_ffree	= retvalues[6];
+	fetchattr(fst, f_blocks);
+	fetchattr(fst, f_bfree);
+	fetchattr(fst, f_bavail);
+	fetchattr(fst, f_files);
+	fetchattr(fst, f_ffree);
 #if FUSE_VERSION >= 25
-	fst->f_favail	= retvalues[7];
-	fst->f_flag     = retvalues[8];
-	fst->f_namemax  = retvalues[9];
+	fetchattr(fst, f_favail);
+	fetchattr(fst, f_flag);
+	fetchattr(fst, f_namemax);
 #else
-	fst->f_namelen	= retvalues[9];
+	fetchattr(fst, f_namelen);
 #endif
+	
+#undef fetchattr
 
 	ret = 0;
  
@@ -496,7 +486,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"getattr", "readlink", "getdir", "mknod",
 		"mkdir", "unlink", "rmdir", "symlink", "rename",
 		"link", "chmod", "chown", "truncate", "utime",
-		"open", "read", "write", "release", "statvfs", "fsync",
+		"open", "read", "write", "release", "statfs", "fsync",
 		"fuse_args", "multithreaded", NULL};
 	
 	memset(&op, 0, sizeof(op));
