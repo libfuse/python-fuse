@@ -63,7 +63,7 @@ with a 0 default value [#]_.
    ``Klass#attr``. If it's a method, we'll use ``Klass#meth()``.
 
 .. [#] Traditionally, ``os.stat()`` and ``os.statvfs()`` returned tuples.
-   Since Python 2.2, they return dedicated object which both implement the
+   Since Python 2.2, they return dedicated objects which both implement the
    sequence protocol and have the aforementioned attributes (when you print
    them, they look like a tuple).
 

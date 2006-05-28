@@ -130,7 +130,7 @@ class Xmp(Fuse):
         If you are not reusing an existing statvfs object, start with
         fuse.StatVFS(), and define the attributes.
 
-	To provide usable information (ie., you want sensible df(1)
+        To provide usable information (ie., you want sensible df(1)
         output, you are suggested to specify the following attributes:
 
             - f_bsize - preferred size of file blocks, in bytes
@@ -164,7 +164,8 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
     server.parse(values=server, errex=1)
 
     try:
-        os.stat(server.root)
+        if server.fuse_args.do_mount():
+            os.stat(server.root)
     except OSError:
         print >> sys.stderr, "can't stat root of underlying filesystem"
         sys.exit(1)
