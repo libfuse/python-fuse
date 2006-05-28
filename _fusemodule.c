@@ -77,12 +77,22 @@ getattr_func(const char *path, struct stat *st)
 
 	PROLOGUE
 
-#define fetchattr(st, attr)				\
-	if (!(tmp = PyObject_GetAttrString(v, #attr)))	\
-		goto OUT_DECREF;			\
-	if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))	\
-		goto OUT_DECREF;			\
-	st->attr =  PyInt_AsLong(tmp);
+#define fetchattr(st, attr)					\
+	if (!(tmp = PyObject_GetAttrString(v, #attr)))		\
+		goto OUT_DECREF;				\
+	if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))		\
+		goto OUT_DECREF;				\
+	st->attr =  PyInt_AsLong(tmp)
+
+#define fetchattr_soft(st, attr)				\
+	if ((tmp = PyObject_GetAttrString(v, #attr))) {		\
+		if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))	\
+			goto OUT_DECREF;			\
+		st->attr =  PyInt_AsLong(tmp);			\
+	} 
+
+#define fetchattr_soft_d(st, attr, defa) \
+	fetchattr_soft(st, attr) else st->attr = defa
 
 	fetchattr(st, st_mode);
 	fetchattr(st, st_ino);
@@ -94,12 +104,22 @@ getattr_func(const char *path, struct stat *st)
 	fetchattr(st, st_atime);
 	fetchattr(st, st_mtime);
 	fetchattr(st, st_ctime);
+
+	/*
+	 * XXX Following fields are not necessarily available on all platforms
+	 * (were "all" stands for "POSIX-like"). Therefore we should have some
+	 * #ifdef-s around... However, they _are_ available on those platforms
+	 * where FUSE has a chance to run now and in the foreseeable future,
+	 * and we don't use autotools so we just dare to throw these in as is. 
+	 */
+
+	fetchattr_soft(st, st_rdev);
+	fetchattr_soft_d(st, st_blksize, 4096);
+	fetchattr_soft_d(st, st_blocks, (st->st_size + 511)/512);
 	
 #undef fetchattr
-
-	/* Fill in fields not provided by Python lstat() */
-	st->st_blksize= 4096;
-	st->st_blocks= (st->st_size + 511)/512;
+#undef fetchattr_soft
+#undef fetchattr_soft_d
 	
 	ret = 0;
 
