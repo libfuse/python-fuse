@@ -1,5 +1,7 @@
 2006-05-29  Csaba Henk <csaba.henk@creo.hu>
 	* Add some missing Py_DECREF-s.
+	* Make compat layer side effect free, fix bailing out upon
+          the lack of optional stat fields.
 
 2006-05-28  Csaba Henk <csaba.henk@creo.hu>
 	* Add support for st_rdev, st_blksize, st_block stat fields.

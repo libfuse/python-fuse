@@ -499,18 +499,17 @@ class Fuse(object):
         """Enter filesystem service loop."""
 
         if compat_0_1:
-            self.main_0_1_preamble()      
+            args = self.main_0_1_preamble()      
 
         d = {'multithreaded': self.multithreaded and 1 or 0}
         d['fuse_args'] = args or self.fuse_args.assemble()
 
         for a in self._attrs:
             if hasattr(self,a):
-                b = a
-                if compat_0_1:
-                    if self.compatmap.has_key(a):
-                        b = self.compatmap[a]
-                d[a] = ErrnoWrapper(getattr(self, b))
+                c = ''
+                if compat_0_1 and hasattr(self, a + '_compat_0_1'):
+                    c = '_compat_0_1'
+                d[a] = ErrnoWrapper(getattr(self, a + c))
 
         domount = True
         if not args:
@@ -613,23 +612,27 @@ class Fuse(object):
 
     def main_0_1_preamble(self):
  
-        self.fuse_args.mountpoint = self.mountpoint
+	cfargs = FuseArgs()
+
+        cfargs.mountpoint = self.mountpoint
  
         if hasattr(self, 'debug'):
-            self.fuse_args.add('debug')
+            cfargs.add('debug')
  
         if hasattr(self, 'allow_other'):
-            self.fuse_args.add('allow_other')
+            cfargs.add('allow_other')
  
         if hasattr(self, 'kernel_cache'):
-            self.fuse_args.add('kernel_cache')
+            cfargs.add('kernel_cache')
 
-    def tuple2stat(self, *a):
+	return cfargs.assemble()
+
+    def getattr_compat_0_1(self, *a):
         from os import stat_result
 
         return stat_result(self.getattr(*a))
 
-    def statfs2statvfs(self, *a):
+    def statfs_compat_0_1(self, *a):
 
         oout = self.statfs(*a)
         lo = len(oout)
@@ -647,5 +650,3 @@ class Fuse(object):
         svf.f_namemax = oout[6]                   # 9
 
         return svf
-
-    compatmap = { 'getattr' : 'tuple2stat', 'statfs' : 'statfs2statvfs' }

@@ -88,7 +88,12 @@ getattr_func(const char *path, struct stat *st)
 	Py_DECREF(tmp);
 
 #define fetchattr_soft(st, attr)				\
-	if ((tmp = PyObject_GetAttrString(v, #attr))) {		\
+	tmp = PyObject_GetAttrString(v, #attr);			\
+        if (tmp == Py_None) {					\
+		Py_DECREF(tmp);					\
+		tmp = NULL;					\
+	}							\
+	if (tmp) {						\
 		if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) {	\
 			Py_DECREF(tmp);				\
 			goto OUT_DECREF;			\
