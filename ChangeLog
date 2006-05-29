@@ -1,7 +1,10 @@
+2006-05-29  Csaba Henk <csaba.henk@creo.hu>
+	* Add some missing Py_DECREF-s.
+
 2006-05-28  Csaba Henk <csaba.henk@creo.hu>
 	* Add support for st_rdev, st_blksize, st_block stat fields.
-          Noticed by Robert Bradford.
-        * Switch getattr / statfs to an object oriented interface:
+	  Noticed by Robert Bradford.
+	* Switch getattr / statfs to an object oriented interface:
 	   - Revert the addition of the statvfs method.
 	   - Implement compat conversion for old getattr / statfs
 	     results.

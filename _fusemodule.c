@@ -57,7 +57,7 @@ if (PyInt_Check(v)) {		\
 OUT_DECREF:			\
 	Py_DECREF(v);		\
 OUT:				\
-	return ret; 
+	return ret;
 
 /* 
  * Local Variables:
@@ -80,18 +80,24 @@ getattr_func(const char *path, struct stat *st)
 #define fetchattr(st, attr)					\
 	if (!(tmp = PyObject_GetAttrString(v, #attr)))		\
 		goto OUT_DECREF;				\
-	if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))		\
+	if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) {		\
+		Py_DECREF(tmp);					\
 		goto OUT_DECREF;				\
-	st->attr =  PyInt_AsLong(tmp)
+	}							\
+	st->attr =  PyInt_AsLong(tmp);				\
+	Py_DECREF(tmp);
 
 #define fetchattr_soft(st, attr)				\
 	if ((tmp = PyObject_GetAttrString(v, #attr))) {		\
-		if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))	\
+		if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) {	\
 			goto OUT_DECREF;			\
+			Py_DECREF(tmp);				\
+		}						\
 		st->attr =  PyInt_AsLong(tmp);			\
-	} 
+		Py_DECREF(tmp);					\
+	}
 
-#define fetchattr_soft_d(st, attr, defa) \
+#define fetchattr_soft_d(st, attr, defa)			\
 	fetchattr_soft(st, attr) else st->attr = defa
 
 	fetchattr(st, st_mode);
@@ -399,10 +405,13 @@ statfs_func(const char *dummy, struct statfs *fst)
 #define fetchattr(st, attr)						\
 	if (!(tmp = PyObject_GetAttrString(v, #attr)))			\
 		goto OUT_DECREF;					\
-	if (!(PyInt_Check(tmp) || PyLong_Check(tmp)))			\
+	if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) {			\
+		Py_DECREF(tmp);						\
 		goto OUT_DECREF;					\
+	}								\
 	st->attr =  PyInt_Check(tmp) ? PyInt_AsLong(tmp) :		\
-		      (PyLong_Check(tmp) ? PyLong_AsLong(tmp) : 0);
+		      (PyLong_Check(tmp) ? PyLong_AsLong(tmp) : 0);	\
+	Py_DECREF(tmp);
 
 
 	fetchattr(fst, f_bsize);
@@ -519,7 +528,12 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 					&fargseq, &multithreaded))
 		return NULL;
 
-#define DO_ONE_ATTR(name) if(name ## _cb) { Py_INCREF(name ## _cb); op.name = name ## _func; } else { op.name = NULL; }
+#define DO_ONE_ATTR(name)			\
+	 if(name ## _cb) {			\
+		Py_INCREF(name ## _cb);		\
+		op.name = name ## _func;	\
+	} else					\
+		op.name = NULL;
 
 	DO_ONE_ATTR(getattr);
 	DO_ONE_ATTR(readlink);
@@ -542,6 +556,8 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	DO_ONE_ATTR(statfs);
 	DO_ONE_ATTR(fsync);
 
+#undef DO_ONE_ATTR
+
 	if (!fargseq || !PySequence_Check(fargseq) ||
             (fargc = PySequence_Length(fargseq)) == 0) {
 		PyErr_SetString(PyExc_TypeError, "fuse_args is not a non-empty sequence");
@@ -558,12 +574,15 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	
 			pa = PySequence_GetItem(fargseq, i);
 			if (!PyString_Check(pa)) {
+				Py_DECREF(pa);
+
 				PyErr_SetString(PyExc_TypeError,
 			                        "fuse argument is not a string");
 		                return(NULL);
 			}
-
 			fargv[i] =  PyString_AsString(pa);
+
+			Py_DECREF(pa);
 		}
 	}
 
@@ -587,7 +606,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		return (NULL);
 	}
 		 
-	if(multithreaded)
+	if (multithreaded)
 		err = pyfuse_loop_mt(fuse);
 	else
 		err = fuse_loop(fuse);
