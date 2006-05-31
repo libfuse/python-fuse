@@ -59,6 +59,20 @@ OUT_DECREF:			\
 OUT:				\
 	return ret;
 
+#define fetchattr_nam(st, attr, aname)					\
+	if (!(tmp = PyObject_GetAttrString(v, aname)))			\
+		goto OUT_DECREF;					\
+	if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) {			\
+		Py_DECREF(tmp);						\
+		goto OUT_DECREF;					\
+	}								\
+	(st)->attr =  PyInt_Check(tmp) ? PyInt_AsLong(tmp) :		\
+		      (PyLong_Check(tmp) ? PyLong_AsLong(tmp) : 0);	\
+	Py_DECREF(tmp);
+
+#define fetchattr(st, attr)						\
+	fetchattr_nam(st, attr, #attr)
+
 /* 
  * Local Variables:
  * indent-tabs-mode: t
@@ -77,15 +91,16 @@ getattr_func(const char *path, struct stat *st)
 
 	PROLOGUE
 
-#define fetchattr(st, attr)					\
-	if (!(tmp = PyObject_GetAttrString(v, #attr)))		\
-		goto OUT_DECREF;				\
-	if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) {		\
-		Py_DECREF(tmp);					\
-		goto OUT_DECREF;				\
-	}							\
-	st->attr =  PyInt_AsLong(tmp);				\
-	Py_DECREF(tmp);
+	fetchattr(st, st_mode);
+	fetchattr(st, st_ino);
+	fetchattr(st, st_dev);
+	fetchattr(st, st_nlink);
+	fetchattr(st, st_uid);
+	fetchattr(st, st_gid);
+	fetchattr(st, st_size);
+	fetchattr(st, st_atime);
+	fetchattr(st, st_mtime);
+	fetchattr(st, st_ctime);
 
 #define fetchattr_soft(st, attr)				\
 	tmp = PyObject_GetAttrString(v, #attr);			\
@@ -98,23 +113,12 @@ getattr_func(const char *path, struct stat *st)
 			Py_DECREF(tmp);				\
 			goto OUT_DECREF;			\
 		}						\
-		st->attr =  PyInt_AsLong(tmp);			\
+		(st)->attr =  PyInt_AsLong(tmp);		\
 		Py_DECREF(tmp);					\
 	}
 
 #define fetchattr_soft_d(st, attr, defa)			\
 	fetchattr_soft(st, attr) else st->attr = defa
-
-	fetchattr(st, st_mode);
-	fetchattr(st, st_ino);
-	fetchattr(st, st_dev);
-	fetchattr(st, st_nlink);
-	fetchattr(st, st_uid);
-	fetchattr(st, st_gid);
-	fetchattr(st, st_size);
-	fetchattr(st, st_atime);
-	fetchattr(st, st_mtime);
-	fetchattr(st, st_ctime);
 
 	/*
 	 * XXX Following fields are not necessarily available on all platforms
@@ -127,11 +131,10 @@ getattr_func(const char *path, struct stat *st)
 	fetchattr_soft(st, st_rdev);
 	fetchattr_soft_d(st, st_blksize, 4096);
 	fetchattr_soft_d(st, st_blocks, (st->st_size + 511)/512);
-	
-#undef fetchattr
+
 #undef fetchattr_soft
 #undef fetchattr_soft_d
-	
+
 	ret = 0;
 
 	EPILOGUE
@@ -306,7 +309,7 @@ chown_func(const char *path, uid_t u, gid_t g)
 static int
 truncate_func(const char *path, off_t o)
 {
-	PyObject *v = PyObject_CallFunction(truncate_cb, "si", path, o);
+	PyObject *v = PyObject_CallFunction(truncate_cb, "sK", path, o);
 
 	PROLOGUE
 	EPILOGUE
@@ -333,7 +336,7 @@ static int
 read_func(const char *path, char *buf, size_t s, off_t off)
 #endif
 {
-	PyObject *v = PyObject_CallFunction(read_cb, "sii", path, s, off);
+	PyObject *v = PyObject_CallFunction(read_cb, "siK", path, s, off);
 
 	PROLOGUE
 
@@ -356,7 +359,7 @@ static int
 write_func(const char *path, const char *buf, size_t t, off_t off)
 #endif
 {
-	PyObject *v = PyObject_CallFunction(write_cb,"ss#i", path, buf, t, off);
+	PyObject *v = PyObject_CallFunction(write_cb,"ss#K", path, buf, t, off);
 
 	PROLOGUE
 	EPILOGUE
@@ -407,17 +410,6 @@ statfs_func(const char *dummy, struct statfs *fst)
 
 	PROLOGUE
 
-#define fetchattr(st, attr)						\
-	if (!(tmp = PyObject_GetAttrString(v, #attr)))			\
-		goto OUT_DECREF;					\
-	if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) {			\
-		Py_DECREF(tmp);						\
-		goto OUT_DECREF;					\
-	}								\
-	st->attr =  PyInt_Check(tmp) ? PyInt_AsLong(tmp) :		\
-		      (PyLong_Check(tmp) ? PyLong_AsLong(tmp) : 0);	\
-	Py_DECREF(tmp);
-
 
 	fetchattr(fst, f_bsize);
 #if FUSE_VERSION >= 25
@@ -435,8 +427,6 @@ statfs_func(const char *dummy, struct statfs *fst)
 #else
 	fetchattr(fst, f_namelen);
 #endif
-	
-#undef fetchattr
 
 	ret = 0;
  
@@ -565,7 +555,8 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 
 	if (!fargseq || !PySequence_Check(fargseq) ||
             (fargc = PySequence_Length(fargseq)) == 0) {
-		PyErr_SetString(PyExc_TypeError, "fuse_args is not a non-empty sequence");
+		PyErr_SetString(PyExc_TypeError,
+		                "fuse_args is not a non-empty sequence");
 		return(NULL);
 	}
 
