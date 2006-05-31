@@ -425,7 +425,7 @@ statfs_func(const char *dummy, struct statfs *fst)
 	fetchattr(fst, f_flag);
 	fetchattr(fst, f_namemax);
 #else
-	fetchattr(fst, f_namelen);
+	fetchattr_nam(fst, f_namelen, "f_namemax");
 #endif
 
 	ret = 0;
