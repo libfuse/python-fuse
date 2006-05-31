@@ -447,16 +447,47 @@ class StatVfs(object):
 	self.f_flag = 0
 	self.f_namemax = 0
 
+class Direntry(object):
+    """
+    Auxiliary class for carrying directory entry data.
+    Initialized with `name`. Further attributes (each
+    set to 0 as default):
+
+    offset
+        An integer (or long) parameter, used as a bookmark
+        during directory traversal.
+        This needs to be set it you want stateful directory
+        reading.
+
+    type
+       Directory entry type, should be one of the stat type
+       specifiers (stat.S_IFLNK, stat.S_IFBLK, stat.S_IFDIR,
+       stat.S_IFCHR, stat.S_IFREG, stat.S_IFIFO, stat.S_IFSOCK).
+
+    ino
+       Directory entry inode number.
+
+    Note that Python's standard directory reading interface is
+    stateless and provides only names, so the above optional
+    attributes doesn't make sense in that context.
+    """
+
+    def __init__(self, name):
+
+        self.name = name
+        self.offset = 0
+        self.type = 0
+        self.ino = 0
 
 class Fuse(object):
     """
     Python interface to FUSE.
     """
 
-    _attrs = ['getattr', 'readlink', 'getdir', 'mknod', 'mkdir',
+    _attrs = ['getattr', 'readlink', 'readdir', 'mknod', 'mkdir',
               'unlink', 'rmdir', 'symlink', 'rename', 'link', 'chmod',
               'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
-              'statfs', 'fsync', 'create']
+              'statfs', 'fsync', 'create', 'opendir', 'releasedir', 'fsyncdir']
 
     fusage = "%prog [mountpoint] [options]"
     
@@ -504,7 +535,7 @@ class Fuse(object):
         d = {'multithreaded': self.multithreaded and 1 or 0}
         d['fuse_args'] = args or self.fuse_args.assemble()
 
-        if hasattr(self, 'file_class'):
+        if hasattr(self, 'file_class') or hasattr(self, 'dir_class'):
             self.methproxy = {}
 
             class mpx(object):
@@ -513,12 +544,22 @@ class Fuse(object):
                def __call__(self, *a):
                    return getattr(a[-1], self.name)(*(a[1:-1]))
 
+        if hasattr(self, 'file_class'):
             for meth in 'read', 'write', 'fsync', 'release': #, 'flush', 'fgetattr', 'ftruncate'
                 if hasattr(self.file_class, meth):
                     self.methproxy[meth] = mpx(meth) 
 
+        if hasattr(self, 'dir_class'):
+            for methd in 'read', 'fsync', 'release':
+                meth = methd + 'dir'
+                if hasattr(self.dir_class, meth):
+                    self.methproxy[meth] = mpx(meth) 
+
         for a in self._attrs:
-            if hasattr(self,a):
+            b = a
+            if compat_0_1 and self.compatmap.has_key(a):
+                b = self.compatmap[a]
+            if hasattr(self, b):
                 c = ''
                 if compat_0_1 and hasattr(self, a + '_compat_0_1'):
                     c = '_compat_0_1'
@@ -532,16 +573,16 @@ class Fuse(object):
 
     def __getattr__(self, meth):
 
-        if not hasattr(self, 'file_class'):
-            raise AttributeError
-
-        if meth in ('open', 'create'):
+        if meth in ('open', 'create') and hasattr(self, 'file_class'):
             return self.file_class
+
+        if meth == 'opendir' and hasattr(self, 'dir_class'): 
+            return self.dir_class
 
         if hasattr(self, 'methproxy') and self.methproxy.has_key(meth):
             return self.methproxy[meth]
 
-        raise AttributeError
+        raise AttributeError, "Fuse instance has no attribute '%s'" % meth
 
     def GetContext(self):
         return FuseGetContext(self)
@@ -585,7 +626,7 @@ class Fuse(object):
         return fa 
 
     fuseoptref = classmethod(fuseoptref)
-
+            
 
 ##########
 ###
@@ -672,3 +713,13 @@ class Fuse(object):
         svf.f_namemax = oout[6]                   # 9
 
         return svf
+
+    def readdir_compat_0_1(self, path, offset, *fh):
+
+        for name, type in self.getdir(path):
+            de = Direntry(name)
+            de.type = type
+
+            yield de
+
+    compatmap = {'readdir': 'getdir'}

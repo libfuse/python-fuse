@@ -64,8 +64,9 @@ class Xmp(Fuse):
     def readlink(self, path):
         return os.readlink(self.root + path)
 
-    def getdir(self, path):
-        return map(lambda x: (x,0), os.listdir(self.root + path))
+    def readdir(self, path, offset):
+        for e in os.listdir(self.root + path):
+            yield fuse.Direntry(e)
 
     def unlink(self, path):
         return os.unlink(self.root + path)
@@ -123,6 +124,9 @@ class Xmp(Fuse):
 	return os.statvfs(self.root)
 
     def main(self, *a, **kw):
+
+        # Define the file class locally as that seems to be the easiest way to
+        # inject instance specific data into it...
 
         server = self
 

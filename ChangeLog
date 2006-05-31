@@ -5,9 +5,19 @@
 	       be preserved and passed around to I/O requests
 	       on the file in question.
 	     + Added support for `create' method
-             + Wrap this mechanism into OO: file I/O methods
+	     + Wrap this mechanism into OO: file I/O methods
 	       can be implemented via an user specified class.
-	     + Add warning to README.new_fusepy_api
+	     + Add warning to README.new_fusepy_api.
+	   - Stage 2: update directory related features
+	     + Switch to readdir() from deprecated getdir() method.
+	     + Add support for new directory methods.
+	     + Make directory I/O stateful.
+	     + Extend OO wrappers to directories.
+	     + Switch from sequence based data transfer model to general
+	       iterator based one.
+	     + Add a dedicated class to carry directory entries instead
+	       of using tuples.
+	     + Add compact hooks.
 
 2006-05-29  Csaba Henk <csaba.henk@creo.hu>
 	* Add some missing Py_DECREF-s.

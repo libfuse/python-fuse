@@ -28,12 +28,13 @@
 #include <Python.h>
 #include "fuse.h"
 
-static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *getdir_cb=NULL,
+static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *mknod_cb=NULL, *mkdir_cb=NULL, *unlink_cb=NULL, *rmdir_cb=NULL,
   *symlink_cb=NULL, *rename_cb=NULL, *link_cb=NULL, *chmod_cb=NULL,
   *chown_cb=NULL, *truncate_cb=NULL, *utime_cb=NULL,
   *open_cb=NULL, *read_cb=NULL, *write_cb=NULL, *release_cb=NULL,
-  *statfs_cb=NULL, *fsync_cb=NULL, *create_cb=NULL
+  *statfs_cb=NULL, *fsync_cb=NULL, *create_cb=NULL, *opendir_cb=NULL,
+  *releasedir_cb=NULL, *fsyncdir_cb=NULL
   ;
 
 static PyObject *Py_FuseError;
@@ -178,65 +179,114 @@ readlink_func(const char *path, char *link, size_t size)
 	EPILOGUE
 }
 
+#if FUSE_VERSION >= 23
 static int
-getdir_add_entry(PyObject *w, fuse_dirh_t dh, fuse_dirfil_t df)
+opendir_func(const char *path, struct fuse_file_info *fi)
 {
-	PyObject *o0;
-	PyObject *o1;
-	int ret = -EINVAL;
+	PyObject *v = PyObject_CallFunction(opendir_cb, "s", path);
+	PROLOGUE
 
-	if(!PySequence_Check(w)) {
-		printf("getdir item not sequence\n");
-		goto out;
-	}
-	if(PySequence_Length(w) != 2) {
-		printf("getdir item not len 2\n");
-		goto out;
-	}
-	o0 = PySequence_GetItem(w, 0);
-	o1 = PySequence_GetItem(w, 1);
+	fi->fh = (uintptr_t) v;
 
-	if(!PyString_Check(o0)) {
-		printf("getdir item[0] not string\n");
-		goto out_decref;
-	}
-	if(!PyInt_Check(o1)) {
-		printf("getdir item[1] not int\n");
-		goto out_decref;
-	}
+	return 0;
 
-#if FUSE_VERSION >= 21
-	ret = df(dh, PyString_AsString(o0), PyInt_AsLong(o1), 0);
-#else
-	ret = df(dh, PyString_AsString(o0), PyInt_AsLong(o1));	
-#endif
-
-out_decref:
-	Py_DECREF(o0);
-	Py_DECREF(o1);
-
-out:
-	return ret;
+	EPILOGUE
 }
 
 static int
-getdir_func(const char *path, fuse_dirh_t dh, fuse_dirfil_t df)
+releasedir_func(const char *path, struct fuse_file_info *fi)
 {
-	PyObject *v = PyObject_CallFunction(getdir_cb, "s", path);
-	int i;
+	PyObject *v = fi_to_py(fi) ?
+  	              PyObject_CallFunction(releasedir_cb, "sN", path,
+	                                    fi_to_py(fi)) :
+		      PyObject_CallFunction(releasedir_cb, "s", path);
 
 	PROLOGUE
 
-	if(!PySequence_Check(v)) {
-		printf("getdir_func not sequence\n");
+	EPILOGUE
+}
+
+static int
+fsyncdir_func(const char *path, int datasync, struct fuse_file_info *fi)
+{
+	PyObject *v = PYO_CALLWITHFI(fi, fsyncdir_cb, si, path, datasync);
+
+	PROLOGUE
+	EPILOGUE
+}
+
+static __inline int
+dir_add_entry(PyObject *v, void *buf, fuse_fill_dir_t df)
+#else
+static __inline int
+dir_add_entry(PyObject *v, fuse_dirh_t buf, fuse_dirfil_t df)
+#endif
+{
+	PyObject *tmp;
+	int ret = -EINVAL;
+	struct stat st;
+	struct { off_t offset; } offs;
+
+	memset(&st, 0, sizeof(st));
+	fetchattr_nam(&st, st_ino, "ino");
+	fetchattr_nam(&st, st_mode, "type");
+	fetchattr(&offs, offset);
+
+	if (!(tmp = PyObject_GetAttrString(v, "name"))) 
+		goto OUT_DECREF;		       
+	if (!PyString_Check(tmp)) {
+		Py_DECREF(tmp);
+		goto OUT_DECREF;		       
+	}					       
+
+#if FUSE_VERSION >= 23
+	ret = df(buf, PyString_AsString(tmp), &st, offs.offset);
+#elif FUSE_VERSION >= 21
+	ret = df(buf, PyString_AsString(tmp), (st.st_mode & 0170000) >> 12,
+                 st.st_ino);
+#else
+	ret = df(buf, PyString_AsString(tmp), (st.st_mode & 0170000) >> 12);
+#endif
+	Py_DECREF(tmp);
+
+OUT_DECREF:
+	Py_DECREF(v);
+
+	return ret;
+}
+
+#if FUSE_VERSION >= 23
+static int
+readdir_func(const char *path, void *buf, fuse_fill_dir_t df, off_t off,
+             struct fuse_file_info *fi)
+{
+	PyObject *v = PYO_CALLWITHFI(fi, readdir_cb, sK, path, off);
+#else
+static int
+readdir_func(const char *path, fuse_dirh_t buf, fuse_dirfil_t df)
+{
+	PyObject *v = PyObject_CallFunction(readdir_cb, "sK", path);
+#endif
+	PyObject *iter, *w;
+
+	PROLOGUE
+
+	iter = PyObject_GetIter(v);
+	if(!iter) {
+		PyErr_Print();
 		goto OUT_DECREF;
 	}
-	for(i=0; i < PySequence_Length(v); i++) {
-		PyObject *w = PySequence_GetItem(v, i);
-		ret = getdir_add_entry(w, dh, df);
-		Py_DECREF(w);
+
+	while ((w = PyIter_Next(iter))) {
+		ret = dir_add_entry(w, buf, df);
 		if(ret != 0)
 			goto OUT_DECREF;
+	}
+
+	Py_DECREF(iter);
+	if (PyErr_Occurred()) {
+		PyErr_Print();
+		goto OUT_DECREF;
 	}
 	ret = 0;
 
@@ -550,32 +600,44 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	char **fargv;
 
 	static char  *kwlist[] = {
-		"getattr", "readlink", "getdir", "mknod",
+		"getattr", "readlink", "readdir", "mknod",
 		"mkdir", "unlink", "rmdir", "symlink", "rename",
 		"link", "chmod", "chown", "truncate", "utime",
 		"open", "read", "write", "release", "statfs", "fsync",
-		"create", "fuse_args", "multithreaded", NULL};
+		"create", "opendir", "releasedir", "fsyncdir",
+                "fuse_args", "multithreaded", NULL};
 	
 	memset(&op, 0, sizeof(op));
 
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "|OOOOOOOOOOOOOOOOOOOOOOi", 
-					kwlist, &getattr_cb, &readlink_cb, &getdir_cb, &mknod_cb,
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "|OOOOOOOOOOOOOOOOOOOOOOOOOi", 
+					kwlist, &getattr_cb, &readlink_cb, &readdir_cb, &mknod_cb,
 					&mkdir_cb, &unlink_cb, &rmdir_cb, &symlink_cb, &rename_cb,
 					&link_cb, &chmod_cb, &chown_cb, &truncate_cb, &utime_cb,
 					&open_cb, &read_cb, &write_cb, &release_cb, &statfs_cb, &fsync_cb,
-					&create_cb, &fargseq, &multithreaded))
+					&create_cb, &opendir_cb, &releasedir_cb, &fsyncdir_cb,
+                                        &fargseq, &multithreaded))
 		return NULL;
 
-#define DO_ONE_ATTR(name)			\
-	 if(name ## _cb) {			\
-		Py_INCREF(name ## _cb);		\
-		op.name = name ## _func;	\
+#define DO_ONE_ATTR_AS(fname, pyname)		\
+	 if(pyname ## _cb) {			\
+		Py_INCREF(pyname ## _cb);	\
+		op.fname = pyname ## _func;	\
 	} else					\
-		op.name = NULL;
+		op.fname = NULL;
+
+#define DO_ONE_ATTR(name)			\
+	DO_ONE_ATTR_AS(name, name)
 
 	DO_ONE_ATTR(getattr);
 	DO_ONE_ATTR(readlink);
-	DO_ONE_ATTR(getdir);
+#if FUSE_VERSION >= 23
+	DO_ONE_ATTR(opendir);
+	DO_ONE_ATTR(releasedir);
+	DO_ONE_ATTR(fsyncdir);
+	DO_ONE_ATTR(readdir);
+#else
+	DO_ONE_ATTR_AS(getdir, readdir);
+#endif
 	DO_ONE_ATTR(mknod);
 	DO_ONE_ATTR(mkdir);
 	DO_ONE_ATTR(unlink);
