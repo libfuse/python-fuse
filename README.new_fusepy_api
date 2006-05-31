@@ -7,6 +7,15 @@ user and the developer POV.
 
 .. contents::
 
+
+.. Attention:: The code is being adjusted so that it can sanely use
+   newer FUSE features.
+
+   This document will not be updated until the end of this period.
+   Moreover, you can count on temporary breaks in compatibility 
+   with oldish code (either C or Python).
+
+
 Enforcing compatibility
 -----------------------
 

@@ -456,7 +456,7 @@ class Fuse(object):
     _attrs = ['getattr', 'readlink', 'getdir', 'mknod', 'mkdir',
               'unlink', 'rmdir', 'symlink', 'rename', 'link', 'chmod',
               'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
-              'statfs', 'fsync']
+              'statfs', 'fsync', 'create']
 
     fusage = "%prog [mountpoint] [options]"
     
@@ -504,6 +504,19 @@ class Fuse(object):
         d = {'multithreaded': self.multithreaded and 1 or 0}
         d['fuse_args'] = args or self.fuse_args.assemble()
 
+        if hasattr(self, 'file_class'):
+            self.methproxy = {}
+
+            class mpx(object):
+               def __init__(self, name):
+                   self.name = name
+               def __call__(self, *a):
+                   return getattr(a[-1], self.name)(*(a[1:-1]))
+
+            for meth in 'read', 'write', 'fsync', 'release': #, 'flush', 'fgetattr', 'ftruncate'
+                if hasattr(self.file_class, meth):
+                    self.methproxy[meth] = mpx(meth) 
+
         for a in self._attrs:
             if hasattr(self,a):
                 c = ''
@@ -511,21 +524,30 @@ class Fuse(object):
                     c = '_compat_0_1'
                 d[a] = ErrnoWrapper(getattr(self, a + c))
 
-        domount = True
-        if not args:
-            domount = self.fuse_args.do_mount()
-
         try:
             main(**d)
         except FuseError:
-            if domount: raise
+            if args or self.fuse_args.do_mount():
+                raise
+
+    def __getattr__(self, meth):
+
+        if not hasattr(self, 'file_class'):
+            raise AttributeError
+
+        if meth in ('open', 'create'):
+            return self.file_class
+
+        if hasattr(self, 'methproxy') and self.methproxy.has_key(meth):
+            return self.methproxy[meth]
+
+        raise AttributeError
 
     def GetContext(self):
         return FuseGetContext(self)
 
     def Invalidate(self, path):
         return FuseInvalidate(self, path)
-
  
     def fuseoptref(cls):
         """
@@ -612,7 +634,7 @@ class Fuse(object):
 
     def main_0_1_preamble(self):
  
-	cfargs = FuseArgs()
+        cfargs = FuseArgs()
 
         cfargs.mountpoint = self.mountpoint
  

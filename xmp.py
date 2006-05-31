@@ -25,7 +25,15 @@ if not hasattr(fuse, '__version__'):
     raise RuntimeError, \
         "your fuse-py doesn't know of fuse.__version__, probably it's too old."
 
-import thread
+def flag2mode(flags):
+    md = {os.O_RDONLY: 'r', os.O_WRONLY: 'w', os.O_RDWR: 'w+'}
+    m = md[flags & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR)]
+
+    if flags | os.O_APPEND:
+        m = m.replace('w', 'a', 1)
+
+    return m
+
 class Xmp(Fuse):
 
     root = '/'
@@ -34,25 +42,21 @@ class Xmp(Fuse):
 
         Fuse.__init__(self, *args, **kw)
 
-        if 0:
-            print "xmp.py:Xmp:mountpoint: %s" % repr(self.mountpoint)
-            print "xmp.py:Xmp:unnamed mount options: %s" % self.optlist
-            print "xmp.py:Xmp:named mount options: %s" % self.optdict
-
         # do stuff to set up your filesystem here, if you want
+        #import thread
         #thread.start_new_thread(self.mythread, ())
         pass
 
-    def mythread(self):
-
-        """
-        The beauty of the FUSE python implementation is that with the python interp
-        running in foreground, you can have threads
-        """
-        print "mythread: started"
-        #while 1:
-        #    time.sleep(120)
-        #    print "mythread: ticking"
+#    def mythread(self):
+#
+#        """
+#        The beauty of the FUSE python implementation is that with the python interp
+#        running in foreground, you can have threads
+#        """
+#        print "mythread: started"
+#        while 1:
+#            time.sleep(120)
+#            print "mythread: ticking"
 
     def getattr(self, path):
         return os.lstat(self.root + path)
@@ -89,39 +93,13 @@ class Xmp(Fuse):
         return f.truncate(size)
 
     def mknod(self, path, mode, dev):
-        """ Python has no os.mknod, so we can only do some things """
-        if S_ISREG(mode):
-            open(self.root + path, "w")
-        else:
-            return -EINVAL
+        os.mknod(self.root + path, mode, dev)
 
     def mkdir(self, path, mode):
         return os.mkdir(self.root + path, mode)
 
     def utime(self, path, times):
         return os.utime(self.root + path, times)
-
-    def open(self, path, flags):
-        #print "xmp.py:Xmp:open: %s" % path
-        os.close(os.open(self.root + path, flags))
-        return 0
-
-    def read(self, path, length, offset):
-        #print "xmp.py:Xmp:read: %s" % path
-        f = open(self.root + path, "r")
-        f.seek(offset)
-        return f.read(length)
-
-    def write(self, path, buf, off):
-        #print "xmp.py:Xmp:write: %s" % path
-        f = open(self.root + path, "r+")
-        f.seek(off)
-        f.write(buf)
-        return len(buf)
-
-    def release(self, path, flags):
-        print "xmp.py:Xmp:release: %s %s" % (path, flags)
-        return 0
 
     def statfs(self):
         """
@@ -144,9 +122,38 @@ class Xmp(Fuse):
 
 	return os.statvfs(self.root)
 
-    def fsync(self, path, isfsyncfile):
-        print "xmp.py:Xmp:fsync: path=%s, isfsyncfile=%s" % (self.root + path, isfsyncfile)
-        return 0
+    def main(self, *a, **kw):
+
+        server = self
+
+        class XmpFile:
+        
+            def __init__(self, path, flags, *mode):
+                self.file = os.fdopen(os.open(server.root + path, flags, *mode),
+                                      flag2mode(flags))
+
+            def read(self, length, offset):
+                self.file.seek(offset)
+                return self.file.read(length)
+        
+            def write(self, buf, offset):
+                self.file.seek(offset)
+                self.file.write(buf)
+                return len(buf)
+        
+            def release(self, flags):
+                self.file.close()
+        
+            def fsync(self, isfsyncfile):
+                if isfsyncfile and hasattr(os, 'fdatasync'):
+                    os.fdatasync(self.file.fileno())
+                else:
+                    os.fsync(self.file.fileno())
+
+        self.file_class = XmpFile
+
+        return Fuse.main(self, *a, **kw)
+
 
 if __name__ == '__main__':
 
@@ -169,5 +176,5 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
     except OSError:
         print >> sys.stderr, "can't stat root of underlying filesystem"
         sys.exit(1)
-     
+
     server.main()

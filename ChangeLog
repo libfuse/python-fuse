@@ -1,3 +1,14 @@
+2006-05-31  Csaba Henk <csaba.henk@creo.hu>
+	* Update code so that it can use newer FUSE features:
+	   - Stage 1: make file I/O stateful.
+	     + If `open' methods returns an object, that will
+	       be preserved and passed around to I/O requests
+	       on the file in question.
+	     + Added support for `create' method
+             + Wrap this mechanism into OO: file I/O methods
+	       can be implemented via an user specified class.
+	     + Add warning to README.new_fusepy_api
+
 2006-05-29  Csaba Henk <csaba.henk@creo.hu>
 	* Add some missing Py_DECREF-s.
 	* Make compat layer side effect free, fix bailing out upon

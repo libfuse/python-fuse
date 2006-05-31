@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/mount.h>
+#include <stdint.h>
 #include <time.h>
 #include <Python.h>
 #include "fuse.h"
@@ -32,7 +33,7 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *getdir_cb=NULL,
   *symlink_cb=NULL, *rename_cb=NULL, *link_cb=NULL, *chmod_cb=NULL,
   *chown_cb=NULL, *truncate_cb=NULL, *utime_cb=NULL,
   *open_cb=NULL, *read_cb=NULL, *write_cb=NULL, *release_cb=NULL,
-  *statfs_cb=NULL, *fsync_cb=NULL
+  *statfs_cb=NULL, *fsync_cb=NULL, *create_cb=NULL
   ;
 
 static PyObject *Py_FuseError;
@@ -58,6 +59,23 @@ OUT_DECREF:			\
 	Py_DECREF(v);		\
 OUT:				\
 	return ret;
+
+#if FUSE_VERSION >= 22
+static __inline PyObject *
+fi_to_py(struct fuse_file_info *fi)
+{
+	return (PyObject *)(uintptr_t)fi->fh;
+}
+
+#define PYO_CALLWITHFI(fi, fnc, fmt, ...)				      \
+	fi_to_py(fi) ?							      \
+	PyObject_CallFunction(fnc, #fmt "O", ## __VA_ARGS__, fi_to_py(fi)) :  \
+	PyObject_CallFunction(fnc, #fmt, ## __VA_ARGS__)
+#else
+#define PYO_CALLWITHFI(fi, fnc, fmt, ...)				      \
+	PyObject_CallFunction(fnc, #fmt, ## __VA_ARGS__)
+#endif /* FUSE_VERSION >= 22 */
+
 
 #define fetchattr_nam(st, attr, aname)					\
 	if (!(tmp = PyObject_GetAttrString(v, aname)))			\
@@ -336,7 +354,7 @@ static int
 read_func(const char *path, char *buf, size_t s, off_t off)
 #endif
 {
-	PyObject *v = PyObject_CallFunction(read_cb, "siK", path, s, off);
+	PyObject *v = PYO_CALLWITHFI(fi, read_cb, siK, path, s, off);
 
 	PROLOGUE
 
@@ -359,7 +377,7 @@ static int
 write_func(const char *path, const char *buf, size_t t, off_t off)
 #endif
 {
-	PyObject *v = PyObject_CallFunction(write_cb,"ss#K", path, buf, t, off);
+	PyObject *v = PYO_CALLWITHFI(fi, write_cb, ss#K, path, buf, t, off);
 
 	PROLOGUE
 	EPILOGUE
@@ -370,22 +388,48 @@ static int
 open_func(const char *path, struct fuse_file_info *fi)
 {
 	PyObject *v = PyObject_CallFunction(open_cb, "si", path, fi->flags);
+	PROLOGUE
+
+	fi->fh = (uintptr_t) v;
+
+	return 0;
+
+	EPILOGUE
+}
 #else
 static int
 open_func(const char *path, int mode)
 {
 	PyObject *v = PyObject_CallFunction(open_cb, "si", path, mode);
-#endif
 	PROLOGUE
 
 	EPILOGUE
 }
+#endif
+
+#if FUSE_VERSION >= 25
+static int
+create_func(const char *path, mode_t mode, struct fuse_file_info *fi)
+{
+	PyObject *v = PyObject_CallFunction(create_cb, "si", path, fi->flags, mode);
+	PROLOGUE
+
+	fi->fh = (uintptr_t) v;
+
+	return 0;
+
+	EPILOGUE
+}
+#endif
 
 #if FUSE_VERSION >= 22
 static int
 release_func(const char *path, struct fuse_file_info *fi)
 {
-	PyObject *v = PyObject_CallFunction(release_cb, "si", path, fi->flags);
+	PyObject *v = fi_to_py(fi) ?
+		      PyObject_CallFunction(release_cb, "siN", path, fi->flags,
+		                            fi_to_py(fi)) :
+		      PyObject_CallFunction(release_cb, "si", path, fi->flags);
 #else
 static int
 release_func(const char *path, int flags)
@@ -436,14 +480,13 @@ statfs_func(const char *dummy, struct statfs *fst)
 #if FUSE_VERSION >= 22
 static int
 fsync_func(const char *path, int datasync, struct fuse_file_info *fi)
-{
-	PyObject *v = PyObject_CallFunction(fsync_cb, "si", path, datasync);
 #else
 static int
-fsync_func(const char *path, int isfsyncfile)
-{
-	PyObject *v = PyObject_CallFunction(fsync_cb, "si", path, isfsyncfile);
+fsync_func(const char *path, int datasync)
 #endif
+{
+	PyObject *v = PYO_CALLWITHFI(fi, fsync_cb, si, path, datasync);
+
 	PROLOGUE
 	EPILOGUE
 }
@@ -511,16 +554,16 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"mkdir", "unlink", "rmdir", "symlink", "rename",
 		"link", "chmod", "chown", "truncate", "utime",
 		"open", "read", "write", "release", "statfs", "fsync",
-		"fuse_args", "multithreaded", NULL};
+		"create", "fuse_args", "multithreaded", NULL};
 	
 	memset(&op, 0, sizeof(op));
 
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "|OOOOOOOOOOOOOOOOOOOOOi", 
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "|OOOOOOOOOOOOOOOOOOOOOOi", 
 					kwlist, &getattr_cb, &readlink_cb, &getdir_cb, &mknod_cb,
 					&mkdir_cb, &unlink_cb, &rmdir_cb, &symlink_cb, &rename_cb,
 					&link_cb, &chmod_cb, &chown_cb, &truncate_cb, &utime_cb,
 					&open_cb, &read_cb, &write_cb, &release_cb, &statfs_cb, &fsync_cb,
-					&fargseq, &multithreaded))
+					&create_cb, &fargseq, &multithreaded))
 		return NULL;
 
 #define DO_ONE_ATTR(name)			\
@@ -550,6 +593,9 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	DO_ONE_ATTR(release);
 	DO_ONE_ATTR(statfs);
 	DO_ONE_ATTR(fsync);
+#if FUSE_VERSION >= 25
+	DO_ONE_ATTR(create);
+#endif
 
 #undef DO_ONE_ATTR
 
