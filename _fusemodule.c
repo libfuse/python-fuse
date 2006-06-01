@@ -278,9 +278,8 @@ readdir_func(const char *path, fuse_dirh_t buf, fuse_dirfil_t df)
 	}
 
 	while ((w = PyIter_Next(iter))) {
-		ret = dir_add_entry(w, buf, df);
-		if(ret != 0)
-			goto OUT_DECREF;
+		if (dir_add_entry(w, buf, df))
+			break;
 	}
 
 	Py_DECREF(iter);
