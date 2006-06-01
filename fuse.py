@@ -479,6 +479,7 @@ class Direntry(object):
         self.type = 0
         self.ino = 0
 
+
 class Fuse(object):
     """
     Python interface to FUSE.
@@ -508,6 +509,7 @@ class Fuse(object):
         kw['fuse'] = self
 
         self.parser = FuseOptParse(*args, **kw)
+        self.methproxy = self.Methproxy()
 
     def parse(self, *args, **kw):
         """Parse command line, fill `fuse_args` attribute."""
@@ -535,25 +537,9 @@ class Fuse(object):
         d = {'multithreaded': self.multithreaded and 1 or 0}
         d['fuse_args'] = args or self.fuse_args.assemble()
 
-        if hasattr(self, 'file_class') or hasattr(self, 'dir_class'):
-            self.methproxy = {}
-
-            class mpx(object):
-               def __init__(self, name):
-                   self.name = name
-               def __call__(self, *a):
-                   return getattr(a[-1], self.name)(*(a[1:-1]))
-
-        if hasattr(self, 'file_class'):
-            for meth in 'read', 'write', 'fsync', 'release': #, 'flush', 'fgetattr', 'ftruncate'
-                if hasattr(self.file_class, meth):
-                    self.methproxy[meth] = mpx(meth) 
-
-        if hasattr(self, 'dir_class'):
-            for methd in 'read', 'fsync', 'release':
-                meth = methd + 'dir'
-                if hasattr(self.dir_class, meth):
-                    self.methproxy[meth] = mpx(meth) 
+        for t in 'file_class', 'dir_class':
+            if hasattr(self, t):
+                getattr(self.methproxy, 'set_' + t)(getattr(self,t))
 
         for a in self._attrs:
             b = a
@@ -570,19 +556,6 @@ class Fuse(object):
         except FuseError:
             if args or self.fuse_args.do_mount():
                 raise
-
-    def __getattr__(self, meth):
-
-        if meth in ('open', 'create') and hasattr(self, 'file_class'):
-            return self.file_class
-
-        if meth == 'opendir' and hasattr(self, 'dir_class'): 
-            return self.dir_class
-
-        if hasattr(self, 'methproxy') and self.methproxy.has_key(meth):
-            return self.methproxy[meth]
-
-        raise AttributeError, "Fuse instance has no attribute '%s'" % meth
 
     def GetContext(self):
         return FuseGetContext(self)
@@ -626,7 +599,57 @@ class Fuse(object):
         return fa 
 
     fuseoptref = classmethod(fuseoptref)
-            
+
+
+    class Methproxy(object):
+    
+        def __init__(self):
+    
+            class mpx(object):
+               def __init__(self, name):
+                   self.name = name
+               def __call__(self, *a):
+                   return getattr(a[-1], self.name)(*(a[1:-1]))
+    
+            self.proxyclass = mpx
+            self.mdic = {}
+            self.file_class = None
+            self.dir_class = None
+    
+        def __call__(self, meth):
+            return self.mdic.has_key(meth) and self.mdic[meth] or None
+    
+        def _add_class_type(cls, type, inits, proxied):
+    
+            def setter(self, xcls):
+   
+                setattr(self, type + '_class', xcls)
+    
+                for m in inits:
+                    self.mdic[m] = xcls
+    
+                for m in proxied:
+                    if hasattr(xcls, m):
+                        self.mdic[m] = self.proxyclass(m)
+    
+            setattr(cls, 'set_' + type + '_class', setter)
+                
+        _add_class_type = classmethod(_add_class_type)
+    
+    Methproxy._add_class_type('file', ('open', 'create'),
+                              ('read', 'write', 'fsync', 'release'))
+    Methproxy._add_class_type('dir', ('opendir',),
+                              [ m + 'dir' for m in 'read', 'fsync', 'release'])
+
+
+    def __getattr__(self, meth):
+
+        m = self.methproxy(meth)
+        if m:
+            return m
+
+        raise AttributeError, "Fuse instance has no attribute '%s'" % meth
+
 
 ##########
 ###

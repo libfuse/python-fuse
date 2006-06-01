@@ -1,3 +1,7 @@
+2006-06-01  Csaba Henk <csaba.henk@creo.hu>
+	* Distillate Fuse instance -> <file> method proxying code into a
+	  dedicated class.
+
 2006-05-31  Csaba Henk <csaba.henk@creo.hu>
 	* Update code so that it can use newer FUSE features:
 	   - Stage 1: make file I/O stateful.
