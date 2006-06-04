@@ -4,6 +4,7 @@
 	  removexattr.
 	* Added interface for retrieving FUSE API version and requiring
 	  features from the underlying library.
+	* Sanitize xmp.py methods.
 
 2006-06-01  Csaba Henk <csaba.henk@creo.hu>
 	* Distillate Fuse instance -> <file> method proxying code into a

@@ -35,7 +35,7 @@ def flag2mode(flags):
     return m
 
 
-fuse.feature_assert('stateful_io')
+fuse.feature_assert('stateful_files')
 
 
 class Xmp(Fuse):
@@ -73,45 +73,48 @@ class Xmp(Fuse):
             yield fuse.Direntry(e)
 
     def unlink(self, path):
-        return os.unlink(self.root + path)
+        os.unlink(self.root + path)
 
     def rmdir(self, path):
-        return os.rmdir(self.root + path)
+        os.rmdir(self.root + path)
 
     def symlink(self, path, path1):
-        return os.symlink(path, self.root + path1)
+        os.symlink(path, self.root + path1)
 
     def rename(self, path, path1):
-        return os.rename(self.root + path, self.root + path1)
+        os.rename(self.root + path, self.root + path1)
 
     def link(self, path, path1):
-        return os.link(self.root + path, self.root + path1)
+        os.link(self.root + path, self.root + path1)
 
     def chmod(self, path, mode):
-        return os.chmod(self.root + path, mode)
+        os.chmod(self.root + path, mode)
 
     def chown(self, path, user, group):
-        return os.chown(self.root + path, user, group)
+        os.chown(self.root + path, user, group)
 
-    def truncate(self, path, size):
-        f = open(self.root + path, "w+")
-        return f.truncate(size)
+    def truncate(self, path, len):
+        f = open(self.root + path, "a")
+        f.truncate(len)
+        f.close()
 
     def mknod(self, path, mode, dev):
         os.mknod(self.root + path, mode, dev)
 
     def mkdir(self, path, mode):
-        return os.mkdir(self.root + path, mode)
+        os.mkdir(self.root + path, mode)
 
     def utime(self, path, times):
-        return os.utime(self.root + path, times)
+        os.utime(self.root + path, times)
 
     def access(self, path, mode):
         if not os.access(self.root + path, mode):
             import errno
             return -errno.EACCES
 
-#    This is how we could add a stub extended attribute interface...
+#    This is how we could add stub extended attribute handlers...
+#    (We can't have ones which aptly delegate requests to the underlying fs
+#    because Python lacks a standard xattr interface.)
 #
 #    def getxattr(self, path, name, size):
 #        val = name.swapcase() + '@' + path
@@ -183,13 +186,15 @@ class Xmp(Fuse):
                     os.fsync(self.fd)
 
             def flush(self):
+                self.file.flush()
+                # cf. xmp_flush() in fusexmp_fh.c
                 os.close(os.dup(self.fd))
 
             def fgetattr(self):
                 return os.fstat(self.fd)
 
             def ftruncate(self, len):
-                os.ftruncate(self.fd, len)
+                self.file.truncate(len)
 
         self.file_class = XmpFile
 
