@@ -1,3 +1,8 @@
+2006-06-04  Csaba Henk <csaba.henk@creo.hu>
+	* Added support for the rest of FUSE methods:
+	  flush, fgetattr, ftruncate, access, getxattr, listxattr, setxattr,
+	  removexattr.
+
 2006-06-01  Csaba Henk <csaba.henk@creo.hu>
 	* Distillate Fuse instance -> <file> method proxying code into a
 	  dedicated class.

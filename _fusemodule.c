@@ -34,8 +34,9 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *chown_cb=NULL, *truncate_cb=NULL, *utime_cb=NULL,
   *open_cb=NULL, *read_cb=NULL, *write_cb=NULL, *release_cb=NULL,
   *statfs_cb=NULL, *fsync_cb=NULL, *create_cb=NULL, *opendir_cb=NULL,
-  *releasedir_cb=NULL, *fsyncdir_cb=NULL
-  ;
+  *releasedir_cb=NULL, *fsyncdir_cb=NULL, *flush_cb=NULL, *ftruncate_cb=NULL,
+  *fgetattr_cb=NULL, *getxattr_cb=NULL, *listxattr_cb=NULL, *setxattr_cb=NULL,
+  *removexattr_cb=NULL, *access_cb=NULL;
 
 static PyObject *Py_FuseError;
 
@@ -103,10 +104,9 @@ fi_to_py(struct fuse_file_info *fi)
  */
 
 static int
-getattr_func(const char *path, struct stat *st)
+getattr_backend(struct stat *st, PyObject *v)
 {
 	PyObject *tmp;
-	PyObject *v = PyObject_CallFunction(getattr_cb, "s", path);
 
 	PROLOGUE
 
@@ -158,6 +158,24 @@ getattr_func(const char *path, struct stat *st)
 
 	EPILOGUE
 }
+
+static int
+getattr_func(const char *path, struct stat *st)
+{
+	PyObject *v = PyObject_CallFunction(getattr_cb, "s", path);
+
+	return getattr_backend(st, v);
+}
+
+#if FUSE_VERSION >= 25
+static int
+fgetattr_func(const char *path, struct stat *st, struct fuse_file_info *fi)
+{
+	PyObject *v = PYO_CALLWITHFI(fi, fgetattr_cb, s, path);
+
+	return getattr_backend(st, v);
+}
+#endif
 
 static int
 readlink_func(const char *path, char *link, size_t size)
@@ -374,13 +392,24 @@ chown_func(const char *path, uid_t u, gid_t g)
 }
 
 static int
-truncate_func(const char *path, off_t o)
+truncate_func(const char *path, off_t length)
 {
-	PyObject *v = PyObject_CallFunction(truncate_cb, "sK", path, o);
+	PyObject *v = PyObject_CallFunction(truncate_cb, "sK", path, length);
 
 	PROLOGUE
 	EPILOGUE
 }
+
+#if FUSE_VERSION >= 25
+static int
+ftruncate_func(const char *path, off_t length, struct fuse_file_info *fi)
+{
+	PyObject *v = PYO_CALLWITHFI(fi, ftruncate_cb, sK, path, length);
+
+	PROLOGUE
+	EPILOGUE
+}
+#endif
 
 static int
 utime_func(const char *path, struct utimbuf *u)
@@ -540,6 +569,119 @@ fsync_func(const char *path, int datasync)
 	EPILOGUE
 }
 
+#if FUSE_VERSION >= 22
+static int
+flush_func(const char *path, struct fuse_file_info *fi)
+#else
+static int
+flush_func(const char *path)
+#endif
+{
+	PyObject *v = PYO_CALLWITHFI(fi, flush_cb, s, path);
+
+	PROLOGUE
+	EPILOGUE
+}
+
+static int
+getxattr_func(const char *path, const char *name, char *value, size_t size)
+{
+	PyObject *v = PyObject_CallFunction(getxattr_cb, "ssi", path, name,
+	                                    size);
+
+	PROLOGUE
+
+	if(PyString_Check(v)) {
+		if(PyString_Size(v) > size)
+			goto OUT_DECREF;
+		memcpy(value, PyString_AsString(v), PyString_Size(v));
+		ret = PyString_Size(v);
+	}
+
+	EPILOGUE
+}
+
+static int
+listxattr_func(const char *path, char *list, size_t size)
+{
+	PyObject *v = PyObject_CallFunction(listxattr_cb, "si", path, size);
+	PyObject *iter, *w;
+	char *lx = list;
+
+	PROLOGUE
+
+	iter = PyObject_GetIter(v);
+	if(!iter) {
+		PyErr_Print();
+		goto OUT_DECREF;
+	}
+
+	for (;;) {
+		int ilen;
+
+	        w = PyIter_Next(iter);
+		if (!w) {
+			ret = lx - list;
+			break;
+		}
+
+		if (!PyString_Check(w)) {
+			Py_DECREF(w);
+			break;
+		}
+
+		ilen = PyString_Size(w);
+		if (lx - list + ilen >= size) {
+			Py_DECREF(w);
+			break;
+		}
+
+		strncpy(lx, PyString_AsString(w), ilen + 1);
+		lx += ilen + 1;
+
+		Py_DECREF(w);
+	}
+
+	Py_DECREF(iter);
+	if (PyErr_Occurred()) {
+		PyErr_Print();
+		ret = -EINVAL;
+	}
+
+	EPILOGUE
+}
+
+static int
+setxattr_func(const char *path, const char *name, const char *value,
+              size_t size, int flags)
+{
+	PyObject *v = PyObject_CallFunction(setxattr_cb, "sss#i", path, name,
+                                            value, size, flags);
+
+	PROLOGUE
+	EPILOGUE
+}
+
+static int
+removexattr_func(const char *path, const char *name)
+{
+	PyObject *v = PyObject_CallFunction(removexattr_cb, "ss", path, name);
+
+	PROLOGUE
+	EPILOGUE
+}
+
+#if FUSE_VERSION >= 25
+static int
+access_func(const char *path, int mask)
+{
+	PyObject *v = PyObject_CallFunction(access_cb, "si", path, mask);
+
+	PROLOGUE
+	EPILOGUE
+}
+#endif
+
 static void
 process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
 {
@@ -603,18 +745,29 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"mkdir", "unlink", "rmdir", "symlink", "rename",
 		"link", "chmod", "chown", "truncate", "utime",
 		"open", "read", "write", "release", "statfs", "fsync",
-		"create", "opendir", "releasedir", "fsyncdir",
-                "fuse_args", "multithreaded", NULL};
+		"create", "opendir", "releasedir", "fsyncdir", "flush",
+	        "ftruncate", "fgetattr", "getxattr", "listxattr", "setxattr",
+	        "removexattr", "access", "fuse_args", "multithreaded", NULL
+	};
 	
 	memset(&op, 0, sizeof(op));
 
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "|OOOOOOOOOOOOOOOOOOOOOOOOOi", 
-					kwlist, &getattr_cb, &readlink_cb, &readdir_cb, &mknod_cb,
-					&mkdir_cb, &unlink_cb, &rmdir_cb, &symlink_cb, &rename_cb,
-					&link_cb, &chmod_cb, &chown_cb, &truncate_cb, &utime_cb,
-					&open_cb, &read_cb, &write_cb, &release_cb, &statfs_cb, &fsync_cb,
-					&create_cb, &opendir_cb, &releasedir_cb, &fsyncdir_cb,
-                                        &fargseq, &multithreaded))
+	if (!PyArg_ParseTupleAndKeywords(args, kw,
+	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi", 
+	                                 kwlist, &getattr_cb, &readlink_cb,
+	                                 &readdir_cb, &mknod_cb, &mkdir_cb,
+	                                 &unlink_cb, &rmdir_cb, &symlink_cb,
+	                                 &rename_cb, &link_cb, &chmod_cb,
+	                                 &chown_cb, &truncate_cb, &utime_cb,
+	                                 &open_cb, &read_cb, &write_cb,
+	                                 &release_cb, &statfs_cb, &fsync_cb,
+	                                 &create_cb, &opendir_cb,
+	                                 &releasedir_cb, &fsyncdir_cb,
+	                                 &flush_cb, &ftruncate_cb,
+	                                 &fgetattr_cb, &getxattr_cb,
+	                                 &listxattr_cb, &setxattr_cb,
+	                                 &removexattr_cb, &access_cb,
+	                                 &fargseq, &multithreaded))
 		return NULL;
 
 #define DO_ONE_ATTR_AS(fname, pyname)		\
@@ -654,7 +807,15 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	DO_ONE_ATTR(release);
 	DO_ONE_ATTR(statfs);
 	DO_ONE_ATTR(fsync);
+	DO_ONE_ATTR(flush);
+	DO_ONE_ATTR(getxattr);
+	DO_ONE_ATTR(listxattr);
+	DO_ONE_ATTR(setxattr);
+	DO_ONE_ATTR(removexattr);
 #if FUSE_VERSION >= 25
+	DO_ONE_ATTR(ftruncate);
+	DO_ONE_ATTR(fgetattr);
+	DO_ONE_ATTR(access);
 	DO_ONE_ATTR(create);
 #endif
 

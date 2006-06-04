@@ -488,7 +488,9 @@ class Fuse(object):
     _attrs = ['getattr', 'readlink', 'readdir', 'mknod', 'mkdir',
               'unlink', 'rmdir', 'symlink', 'rename', 'link', 'chmod',
               'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
-              'statfs', 'fsync', 'create', 'opendir', 'releasedir', 'fsyncdir']
+              'statfs', 'fsync', 'create', 'opendir', 'releasedir', 'fsyncdir',
+              'flush', 'fgetattr', 'ftruncate', 'getxattr', 'listxattr',
+              'setxattr', 'removexattr', 'access']
 
     fusage = "%prog [mountpoint] [options]"
     
@@ -637,7 +639,8 @@ class Fuse(object):
         _add_class_type = classmethod(_add_class_type)
     
     Methproxy._add_class_type('file', ('open', 'create'),
-                              ('read', 'write', 'fsync', 'release'))
+                              ('read', 'write', 'fsync', 'release', 'flush',
+                               'fgetattr', 'ftruncate'))
     Methproxy._add_class_type('dir', ('opendir',),
                               [ m + 'dir' for m in 'read', 'fsync', 'release'])
 

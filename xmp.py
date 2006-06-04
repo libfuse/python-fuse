@@ -102,6 +102,29 @@ class Xmp(Fuse):
     def utime(self, path, times):
         return os.utime(self.root + path, times)
 
+    def access(self, path, mode):
+        if not os.access(self.root + path, mode):
+            import errno
+            return -errno.EACCES
+
+#    This is how we could add a stub extended attribute interface...
+#
+#    def getxattr(self, path, name, size):
+#        val = name.swapcase() + '@' + path
+#        if size == 0:
+#            # We are asked for size of the value.
+#            return len(val)
+#        return val 
+#
+#    def listxattr(self, path, size):
+#        # We use the "user" namespace to please XFS utils
+#        aa = ["user." + a for a in ("foo", "bar")]
+#        if size == 0:
+#            # We are asked for size of the attr list, ie. joint size of attrs
+#            # plus null separators.
+#            return len("".join(aa)) + len(aa)
+#        return aa
+
     def statfs(self):
         """
         Should return an object with statvfs attributes (f_bsize, f_frsize...).
@@ -131,28 +154,38 @@ class Xmp(Fuse):
         server = self
 
         class XmpFile:
-        
+
             def __init__(self, path, flags, *mode):
                 self.file = os.fdopen(os.open(server.root + path, flags, *mode),
                                       flag2mode(flags))
+                self.fd = self.file.fileno()
 
             def read(self, length, offset):
                 self.file.seek(offset)
                 return self.file.read(length)
-        
+
             def write(self, buf, offset):
                 self.file.seek(offset)
                 self.file.write(buf)
                 return len(buf)
-        
+
             def release(self, flags):
                 self.file.close()
-        
+
             def fsync(self, isfsyncfile):
                 if isfsyncfile and hasattr(os, 'fdatasync'):
-                    os.fdatasync(self.file.fileno())
+                    os.fdatasync(self.fd)
                 else:
-                    os.fsync(self.file.fileno())
+                    os.fsync(self.fd)
+
+            def flush(self):
+                os.close(os.dup(self.fd))
+
+            def fgetattr(self):
+                return os.fstat(self.fd)
+
+            def ftruncate(self, len):
+                os.ftruncate(self.fd, len)
 
         self.file_class = XmpFile
 
