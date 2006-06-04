@@ -485,14 +485,22 @@ class Direntry(object):
 ########## Interface for requiring certain features from your underlying FUSE library.
 
 
-def feature_need(*feas):
+def feature_needs(*feas):
     """
-    Takes a list of feature specifiers.
-    Returns the smallest FUSE API version number which has all the given features.
+    Get info about the FUSE API version needed for the support of some feature(s).
 
-    To see the list of valid feature specifiers (and the respective requirements),
-    call it without arguments. Besides, any integer `n` is directly interpreted as 
-    requiring FUSE API at least `n`.
+    This function takes a variable number of feature patterns.
+
+    A feature pattern is either an integer (directly referring to a FUSE API version
+    number), a built-in feature specifier, a list/tuple of other feature patterns,
+    or a regexp (meant to be matched against the builtins); this latter can also
+    be given by a string of the from "re:*".
+
+    If called with no arguments, then the list of builtins is returned, mapped
+    to their meaning.
+
+    Otherwise the function returns the smallest FUSE API version number which
+    has all the matching features.
 
     Specifiers worth to explicit mention:
     - ``stateful_files``: you want to use custom filehandles (eg. a file class).
@@ -506,47 +514,37 @@ def feature_need(*feas):
             'access': 25,
             'fgetattr': 25,
             'ftruncate': 25,
-            '*': '.*'}
+            '*': 're:^[^*]'}
 
     if not feas:
         return fmap
 
-    def match(fpat):
+    def resolve(args, maxva):
         import re
 
-        if isinstance(fpat, list) or isinstance(fpat, tuple):
-           return fpat
+        for fp in args:
+            if isinstance(fp, int):
+                 maxva[0] = max(maxva[0], fp)
+                 continue
+            if isinstance(fp, list) or isinstance(fp, tuple):
+                 for f in fp:
+                      yield f
+                 continue
+            ma = isinstance(fp, str) and re.compile("re:(.*)").match(fp)
+            if isinstance(fp, type(re.compile(''))) or ma:
+                if ma:
+                    fp = re.compile(ma.groups()[0])
+                for f in fmap:
+                    if re.search(fp, f):
+                        yield f
+            else:
+                yield fmap[fp]
+        
+    maxva = [0]
+    while feas:
+        feas = set(resolve(feas, maxva))
 
-        if isinstance(fpat, str):
-            fpat = re.compile(fpat)
-
-        if not isinstance(fpat, type(re.compile(''))):  # ouch!
-            raise TypeError, "unhandled pattern type `%s'" % type(fpat)
-
-        return [ f for f in fmap if re.search(fpat, f) ]
-
-    def resolve(feas):
-        return max([ resolve_one(fea) for fea in feas ])
-
-    def resolve_one(fea):
-
-        if isinstance(fea, int):
-            return fea
-
-        if not fmap.has_key(fea):
-            raise KeyError, "unknown FUSE feature `%s'" % str(fea)
-
-        fv = fmap[fea]
-
-        if isinstance(fv, int):
-            return fv
-
-        feas = match(fv)
-        if fea in feas:
-            feas.remove(fea)
-        return resolve(feas)
-
-    return resolve(feas)
+    return maxva[0]
 
 
 def APIVersion():
@@ -555,17 +553,17 @@ def APIVersion():
     return FuseAPIVersion()
 
 
-def feature_req(*feas):
+def feature_assert(*feas):
     """
-    Takes a list of feature specifiers (like `feature_need`).
+    Takes some feature patterns (like in `feature_needs`).
     Raises a fuse.FuseError if your underlying FUSE lib fails
-    to have some of the features.
+    to have some of the matching features.
     """
 
     fav = APIVersion()
 
     for fea in feas:
-        fn = feature_need(fea)
+        fn = feature_needs(fea)
         if fav < fn:
             raise FuseError, \
               "FUSE API version %d is required for feature `%s' but only %d is available" % \
