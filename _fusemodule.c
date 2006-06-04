@@ -949,10 +949,22 @@ FuseGetContext(PyObject *self, PyObject *args)
 	return(ret);
 }
 
+static char FuseAPIVersion__doc__[] =
+	"Return FUSE API version.\n";
+
+static PyObject *
+FuseAPIVersion(PyObject *self, PyObject *args)
+{
+	PyObject *favers = PyInt_FromLong(FUSE_VERSION);
+
+	return favers;
+}
+
 static PyMethodDef Fuse_methods[] = {
 	{"main",	(PyCFunction)Fuse_main,	 METH_VARARGS|METH_KEYWORDS},
 	{"FuseGetContext", (PyCFunction)FuseGetContext, METH_VARARGS, FuseGetContext__doc__},
 	{"FuseInvalidate", (PyCFunction)FuseInvalidate, METH_VARARGS, FuseInvalidate__doc__},
+	{"FuseAPIVersion", (PyCFunction)FuseAPIVersion, METH_NOARGS,  FuseAPIVersion__doc__},
 	{NULL,		NULL}		/* sentinel */
 };
 

@@ -17,7 +17,7 @@ except:
     pass
 
 from _fusemeta import __version__ 
-from _fuse import main, FuseGetContext, FuseInvalidate, FuseError
+from _fuse import main, FuseGetContext, FuseInvalidate, FuseError, FuseAPIVersion
 from string import join
 import sys
 from errno import *
@@ -419,6 +419,8 @@ class ErrnoWrapper(object):
             return -detail
 
 
+########### Custom objects for transmitting system structures to FUSE
+
 class Stat(object):
     """
     Auxiliary class which can be filled up stat attributes.
@@ -478,6 +480,99 @@ class Direntry(object):
         self.offset = 0
         self.type = 0
         self.ino = 0
+
+
+########## Interface for requiring certain features from your underlying FUSE library.
+
+
+def feature_need(*feas):
+    """
+    Takes a list of feature specifiers.
+    Returns the smallest FUSE API version number which has all the given features.
+
+    To see the list of valid feature specifiers (and the respective requirements),
+    call it without arguments. Besides, any integer `n` is directly interpreted as 
+    requiring FUSE API at least `n`.
+
+    Specifiers worth to explicit mention:
+    - ``stateful_files``: you want to use custom filehandles (eg. a file class).
+    - ``*``: you want all features.
+    """
+
+    fmap = {'stateful_files': 22,
+            'stateful_dirs': 23,
+            'stateful_io': ('stateful_files', 'stateful_dirs'),
+            'create': 25,
+            'access': 25,
+            'fgetattr': 25,
+            'ftruncate': 25,
+            '*': '.*'}
+
+    if not feas:
+        return fmap
+
+    def match(fpat):
+        import re
+
+        if isinstance(fpat, list) or isinstance(fpat, tuple):
+           return fpat
+
+        if isinstance(fpat, str):
+            fpat = re.compile(fpat)
+
+        if not isinstance(fpat, type(re.compile(''))):  # ouch!
+            raise TypeError, "unhandled pattern type `%s'" % type(fpat)
+
+        return [ f for f in fmap if re.search(fpat, f) ]
+
+    def resolve(feas):
+        return max([ resolve_one(fea) for fea in feas ])
+
+    def resolve_one(fea):
+
+        if isinstance(fea, int):
+            return fea
+
+        if not fmap.has_key(fea):
+            raise KeyError, "unknown FUSE feature `%s'" % str(fea)
+
+        fv = fmap[fea]
+
+        if isinstance(fv, int):
+            return fv
+
+        feas = match(fv)
+        if fea in feas:
+            feas.remove(fea)
+        return resolve(feas)
+
+    return resolve(feas)
+
+
+def APIVersion():
+    """Get the API version of your underlying FUSE lib"""
+
+    return FuseAPIVersion()
+
+
+def feature_req(*feas):
+    """
+    Takes a list of feature specifiers (like `feature_need`).
+    Raises a fuse.FuseError if your underlying FUSE lib fails
+    to have some of the features.
+    """
+
+    fav = APIVersion()
+
+    for fea in feas:
+        fn = feature_need(fea)
+        if fav < fn:
+            raise FuseError, \
+              "FUSE API version %d is required for feature `%s' but only %d is available" % \
+                 (fn, str(fea), fav)
+
+
+############# Subclass this.
 
 
 class Fuse(object):

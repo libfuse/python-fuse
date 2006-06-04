@@ -34,6 +34,10 @@ def flag2mode(flags):
 
     return m
 
+
+fuse.feature_req('stateful_io')
+
+
 class Xmp(Fuse):
 
     root = '/'

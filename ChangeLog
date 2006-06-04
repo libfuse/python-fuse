@@ -2,6 +2,8 @@
 	* Added support for the rest of FUSE methods:
 	  flush, fgetattr, ftruncate, access, getxattr, listxattr, setxattr,
 	  removexattr.
+	* Added interface for retrieving FUSE API version and requiring
+	  features from the underlying library.
 
 2006-06-01  Csaba Henk <csaba.henk@creo.hu>
 	* Distillate Fuse instance -> <file> method proxying code into a
