@@ -79,7 +79,7 @@ class FuseArgs(object):
     def unsetmod(self, mod):
         self.modifiers[mod] = False
 
-    def do_mount(self):
+    def mount_expected(self):
 
         if self.getmod('showhelp'):
             return False
@@ -493,8 +493,9 @@ def feature_needs(*feas):
 
     A feature pattern is either an integer (directly referring to a FUSE API version
     number), a built-in feature specifier, a list/tuple of other feature patterns,
-    or a regexp (meant to be matched against the builtins); this latter can also
-    be given by a string of the from "re:*".
+    a regexp (meant to be matched against the builtins -- this latter can also
+    be given by a string of the from "re:*"), or a negated regexp, which can be given
+    by a string of the form "!re:*".
 
     If called with no arguments, then the list of builtins is returned, mapped
     to their meaning.
@@ -502,19 +503,21 @@ def feature_needs(*feas):
     Otherwise the function returns the smallest FUSE API version number which
     has all the matching features.
 
-    Specifiers worth to explicit mention:
+    Builtin specifiers worth to explicit mention:
     - ``stateful_files``: you want to use custom filehandles (eg. a file class).
     - ``*``: you want all features.
+    - specifiers like ``has_foo`` refer to requirement that the library knows of
+      the fs method ``foo``.
     """
 
     fmap = {'stateful_files': 22,
-            'stateful_dirs': 23,
-            'stateful_io': ('stateful_files', 'stateful_dirs'),
-            'create': 25,
-            'access': 25,
-            'fgetattr': 25,
-            'ftruncate': 25,
-            '*': 're:^[^*]'}
+            'stateful_dirs':  23,
+            'stateful_io':    ('stateful_files', 'stateful_dirs'),
+            'has_create':     25,
+            'has_access':     25,
+            'has_fgetattr':   25,
+            'has_ftruncate':  25,
+            '*':              '!re:^\*$'}
 
     if not feas:
         return fmap
@@ -530,12 +533,15 @@ def feature_needs(*feas):
                  for f in fp:
                       yield f
                  continue
-            ma = isinstance(fp, str) and re.compile("re:(.*)").match(fp)
+            ma = isinstance(fp, str) and re.compile("(!\s*|)re:(.*)").match(fp)
             if isinstance(fp, type(re.compile(''))) or ma:
+                neg = False
                 if ma:
-                    fp = re.compile(ma.groups()[0])
+                    mag = ma.groups()
+                    fp = re.compile(mag[1])
+                    neg = bool(mag[0])
                 for f in fmap:
-                    if re.search(fp, f):
+                    if neg != bool(re.search(fp, f)):
                         yield f
             else:
                 yield fmap[fp]
@@ -558,6 +564,10 @@ def feature_assert(*feas):
     Takes some feature patterns (like in `feature_needs`).
     Raises a fuse.FuseError if your underlying FUSE lib fails
     to have some of the matching features.
+
+    (Note: use a ``has_foo`` type feature assertion only if lib support
+    for method ``foo`` is necessary for your fs. Don't use this assertion
+    just because your fs implements ``foo``.)
     """
 
     fav = APIVersion()
@@ -567,7 +577,7 @@ def feature_assert(*feas):
         if fav < fn:
             raise FuseError, \
               "FUSE API version %d is required for feature `%s' but only %d is available" % \
-                 (fn, str(fea), fav)
+              (fn, str(fea), fav)
 
 
 ############# Subclass this.
@@ -649,7 +659,7 @@ class Fuse(object):
         try:
             main(**d)
         except FuseError:
-            if args or self.fuse_args.do_mount():
+            if args or self.fuse_args.mount_expected():
                 raise
 
     def GetContext(self):

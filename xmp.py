@@ -217,7 +217,7 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
     server.parse(values=server, errex=1)
 
     try:
-        if server.fuse_args.do_mount():
+        if server.fuse_args.mount_expected():
             os.stat(server.root)
     except OSError:
         print >> sys.stderr, "can't stat root of underlying filesystem"
