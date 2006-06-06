@@ -10,9 +10,8 @@ The best way to install this python FUSE module is:
  1. Type 'python setup.py build'. (If you have FUSE installed at a
     non-standard location, adjust the PKG_CONFIG_PATH environment variable
     accordingly.)
- 2. You might try xmp.py, the example filesystem. Just link
-    build/lib.*/_fusemodule.so to the top of the source tree and
-    see what "python example/xmp.py -h" gives.
+ 2. You might try the example filesystems under example/. Eg., see what
+    "python example/xmp.py -h" gives.
  3. If all has gone ok, become root and type 'python setup.py install'.
 
 That way, the FUSE python modules will be built against the correct version
