@@ -1,19 +1,11 @@
 import sys, os, glob 
-from os.path import realpath, dirname, join, isdir
+from os.path import realpath, dirname, join
 
 ddd = realpath(join(dirname(sys.argv[0]), '..'))
-cdirs = [ d for d in ('.', ddd) if isdir(join(d, 'build')) ]
-if ddd in cdirs:
-    sys.path.append(ddd)
 
-def lookupso(dirs):
-    for d in dirs:
-        for p in glob.glob(join(d, 'build', 'lib.*', '_fusemodule.so')):
-             return dirname(p)
-
-p = lookupso(cdirs)
-if p:
-    sys.path.append(p)
+for d in [ddd, '.']: 
+    for p in glob.glob(join(d, 'build', 'lib.*')):
+         sys.path.append(p)
 
 try:
     import fuse

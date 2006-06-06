@@ -8,7 +8,7 @@ from distutils.core import setup, Extension
 import os
 import sys
 
-from _fusemeta import __version__ 
+from fuseparts import __version__ 
 
 # write default fuse.pc path into environment if PKG_CONFIG_PATH is unset
 #if not os.environ.has_key('PKG_CONFIG_PATH'):
@@ -43,7 +43,7 @@ libsonly = [x[2:] for x in libs.split() if x[0:2] == '-l']
 # libraries=[]
 # runtime_library_dirs=[]
 # extra_objects, extra_compile_args, extra_link_args
-fusemodule = Extension('_fusemodule', sources = ['_fusemodule.c'],
+fusemodule = Extension('fuseparts._fusemodule', sources = ['fuseparts/_fusemodule.c'],
                   include_dirs = iflags,
                   extra_compile_args = extra_cflags,
                   library_dirs = libdirs,
@@ -59,4 +59,5 @@ setup (name = 'fuse-python',
        maintainer = 'Csaba Henk',
        maintainer_email = 'csaba.henk@creo.hu',
        ext_modules = [fusemodule],
-       py_modules=["fuse", "_fusemeta"])
+       packages = ["fuseparts"],
+       py_modules=["fuse"])

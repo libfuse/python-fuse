@@ -6,11 +6,16 @@
 	* Add support for querying any fs method in feature requester.
 	* Replace `foo.has_key(bar)' with `bar in foo'.
 	* Updated docs.
-	* Restructured source tree:
+	* Restructured source tree / I.:
 	   - README -> README.historic
 	   - xmp.py -> example/xmp.py
 	   - added example/hello.py (contributed by Andrew Straw)
 	   - added example/_find_fuse_parts.py (aux script)
+	* Restructured source tree / II.:
+	   - Created fuseparts package
+	   - <generic opt parsing code> -> fuseparts/subbedoptparse.py
+	   - _fusemeta.py -> fuseparts/__init__.py
+	   - _fusemodule.c -> fuseparts/_fusemodule.c
 
 2006-06-04  Csaba Henk <csaba.henk@creo.hu>
 	* Added support for the rest of FUSE methods:
