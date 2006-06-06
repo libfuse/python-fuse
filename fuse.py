@@ -633,15 +633,20 @@ class Direntry(object):
 
 def feature_needs(*feas):
     """
-    Get info about the FUSE API version needed for the support of some feature(s).
+    Get info about the FUSE API version needed for the support of some features.
 
     This function takes a variable number of feature patterns.
 
-    A feature pattern is either an integer (directly referring to a FUSE API version
-    number), a built-in feature specifier, a list/tuple of other feature patterns,
-    a regexp (meant to be matched against the builtins -- this latter can also
-    be given by a string of the from "re:*"), or a negated regexp, which can be given
-    by a string of the form "!re:*".
+    A feature pattern is either:
+
+    -  an integer (directly referring to a FUSE API version number)
+    -  a built-in feature specifier string (meaning defined by dictionary)
+    -  a string of the form ``has_foo``, where ``foo`` is a filesystem method
+       (refers to the API version where the method has been introduced)
+    -  a list/tuple of other feature patterns (matches each of its members)
+    -  a regexp (meant to be matched against the builtins plus ``has_foo``
+       patterns; can also be given by a string of the from "re:*")
+    -  a negated regexp (can be given by a string of the form "!re:*")
 
     If called with no arguments, then the list of builtins is returned, mapped
     to their meaning.
@@ -652,13 +657,20 @@ def feature_needs(*feas):
     Builtin specifiers worth to explicit mention:
     - ``stateful_files``: you want to use custom filehandles (eg. a file class).
     - ``*``: you want all features.
-    - specifiers like ``has_foo`` refer to requirement that the library knows of
+    - while ``has_foo`` makes sense for all filesystem method ``foo``, some
+      of these can be found among the builtins, too (the ones which can be
+      handled by the general rule).
+
+    specifiers like ``has_foo`` refer to requirement that the library knows of
       the fs method ``foo``.
     """
 
     fmap = {'stateful_files': 22,
             'stateful_dirs':  23,
             'stateful_io':    ('stateful_files', 'stateful_dirs'),
+            'has_opendir':    ('stateful_dirs',),
+            'has_releasedir': ('stateful_dirs',),
+            'has_fsyncdir':   ('stateful_dirs',),
             'has_create':     25,
             'has_access':     25,
             'has_fgetattr':   25,
@@ -673,12 +685,12 @@ def feature_needs(*feas):
 
         for fp in args:
             if isinstance(fp, int):
-                 maxva[0] = max(maxva[0], fp)
-                 continue
+                maxva[0] = max(maxva[0], fp)
+                continue
             if isinstance(fp, list) or isinstance(fp, tuple):
-                 for f in fp:
-                      yield f
-                 continue
+                for f in fp:
+                    yield f
+                continue
             ma = isinstance(fp, str) and re.compile("(!\s*|)re:(.*)").match(fp)
             if isinstance(fp, type(re.compile(''))) or ma:
                 neg = False
@@ -686,11 +698,15 @@ def feature_needs(*feas):
                     mag = ma.groups()
                     fp = re.compile(mag[1])
                     neg = bool(mag[0])
-                for f in fmap:
+                for f in fmap.keys() + [ 'has_' + a for a in Fuse._attrs ]:
                     if neg != bool(re.search(fp, f)):
                         yield f
-            else:
-                yield fmap[fp]
+                continue
+            ma = re.compile("has_(.*)").match(fp)
+            if ma and ma.groups()[0] in Fuse._attrs and not fmap.has_key(fp):
+                yield 21
+                continue
+            yield fmap[fp]
 
     maxva = [0]
     while feas:
@@ -712,7 +728,7 @@ def feature_assert(*feas):
     to have some of the matching features.
 
     (Note: use a ``has_foo`` type feature assertion only if lib support
-    for method ``foo`` is necessary for your fs. Don't use this assertion
+    for method ``foo`` is *necessary* for your fs. Don't use this assertion
     just because your fs implements ``foo``. The usefulness of ``has_foo``
     is limited by the fact that we can't guarantee that your FUSE kernel
     module also supports ``foo``.)
