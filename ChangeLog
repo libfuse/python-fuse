@@ -16,6 +16,7 @@
 	   - <generic opt parsing code> -> fuseparts/subbedoptparse.py
 	   - _fusemeta.py -> fuseparts/__init__.py
 	   - _fusemodule.c -> fuseparts/_fusemodule.c
+	* Set True as the default value of the `fetch_mp' parser option.
 
 2006-06-04  Csaba Henk <csaba.henk@creo.hu>
 	* Added support for the rest of FUSE methods:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #    Copyright (C) 2001  Jeff Epler  <jepler@unpythonic.dhs.org>
-#    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu> 
+#    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu>
 #
 #    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.
@@ -214,8 +214,7 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
 
     server = Xmp(version="%prog " + fuse.__version__,
                  usage=usage,
-                 dash_s_do='setsingle',
-                 fetch_mp=True)
+                 dash_s_do='setsingle')
 
     server.parser.add_option(mountopt="root", metavar="PATH", default='/', type=str,
                              help="mirror filesystem from under PATH [default: %default]")

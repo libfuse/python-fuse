@@ -57,18 +57,18 @@ class HelloFS(Fuse):
         else:
             return -errno.ENOENT
         return st
-    
+
     def readdir(self, path, offset):
         for r in  '.', '..', hello_path[1:]:
             yield fuse.Direntry(r)
-    
+
     def open(self, path, flags):
         if path != hello_path:
             return -errno.ENOENT
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
         if (flags & accmode) != os.O_RDONLY:
             return -errno.EACCES
-    
+
     def read(self, path, size, offset):
         if path != hello_path:
             return -errno.ENOENT
@@ -88,9 +88,8 @@ Userspace hello example
 """ + Fuse.fusage
     server = HelloFS(version="%prog " + fuse.__version__,
                      usage=usage,
-                     dash_s_do='setsingle',
-		     fetch_mp=True)
-    
+                     dash_s_do='setsingle')
+
     server.parse(errex=1)
     server.main()
 

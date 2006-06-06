@@ -1,6 +1,6 @@
 #
 #    Copyright (C) 2001  Jeff Epler  <jepler@unpythonic.dhs.org>
-#    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu> 
+#    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu>
 #
 #    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.
@@ -161,9 +161,9 @@ class FuseOptParse(SubbedOptParse):
       options.
 
     fetch_mp
-      Boolean [default is `False`].
-      Setting this option will imply that the last (non-option) argument
-      (if there is such a thing) is treated as the FUSE mountpoint.
+      Boolean [default is `True`].
+      If it's True, then the last (non-option) argument
+      (if there is such a thing) will be used as the FUSE mountpoint.
 
     dash_s_do
       String: ``whine``, ``undef``, or ``setsingle`` [default is ``whine``].
@@ -200,7 +200,10 @@ class FuseOptParse(SubbedOptParse):
         self.fuse_args = \
             'fuse_args' in kw and kw.pop('fuse_args') or FuseArgs()
         dsd = 'dash_s_do' in kw and kw.pop('dash_s_do') or 'whine'
-        self.fetch_mp = 'fetch_mp' in kw and bool(kw.pop('fetch_mp'))
+        if 'fetch_mp' in kw:
+            self.fetch_mp = bool(kw.pop('fetch_mp'))
+        else:
+            self.fetch_mp = True
         if 'standard_mods' in kw:
             smods = bool(kw.pop('standard_mods'))
         else:
