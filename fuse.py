@@ -25,7 +25,7 @@ from os import environ
 from optparse import Option, OptionParser, OptParseError, OptionConflictError
 from optparse import HelpFormatter, IndentedHelpFormatter, SUPPRESS_HELP
 
-compat_0_1 = environ.has_key('FUSE_PYTHON_COMPAT') and \
+compat_0_1 = 'FUSE_PYTHON_COMPAT' in environ and \
              environ['FUSE_PYTHON_COMPAT'] in ('0.1', 'ALL')
 
 
@@ -132,7 +132,7 @@ class SubbedOpt(Option):
 
        self.subopt_map = {}
 
-       if attrs.has_key("subopt"):
+       if "subopt" in attrs:
            self._short_opts = []
            self._long_opts = []
            self._set_opt_strings(opts)
@@ -180,7 +180,7 @@ class SubbedOpt(Option):
                 ov = None
                 if (len(oo) > 1):
                     ov = oo[1]
-                if self.subopt_map.has_key(ok):
+                if ok in self.subopt_map:
                     self.subopt_map[ok].process(ok, ov, values, parser)
                 else:
                     getattr(values, dest).add(*oo)
@@ -190,7 +190,7 @@ class SubbedOpt(Option):
     def register_sub(self, o):
         """Register argument a suboption for `self`."""
 
-        if self.subopt_map.has_key(o.subopt):
+        if o.subopt in self.subopt_map:
             raise OptionConflictError(
               "conflicting suboption handlers for `%s'" % o.subopt,
               o)
@@ -248,11 +248,11 @@ class SubbedOptParse(OptionParser):
 
     def __init__(self, *args, **kw):
 
-         if not kw.has_key('formatter'):
+         if not 'formatter' in kw:
              kw['formatter'] = SubOptIndentedFormatter()
-         if not kw.has_key('option_class'):
+         if not 'option_class' in kw:
              kw['option_class'] = SubbedOpt
-         if kw.has_key('hive_class'):
+         if 'hive_class' in kw:
              self.hive_class = kw.pop('hive_class')
          else:
              self.hive_class = SubOptsHive
@@ -260,13 +260,13 @@ class SubbedOptParse(OptionParser):
          OptionParser.__init__(self, *args, **kw)
 
     def add_option(self, *args, **kwargs):
-        if kwargs.has_key('action') and kwargs['action'] == 'store_hive':
-            if kwargs.has_key('subopt'):
+        if 'action' in kwargs and kwargs['action'] == 'store_hive':
+            if 'subopt' in kwargs:
                 raise OptParseError(
                   """option can't have a `subopt' attr and `action="store_hive"' at the same time""")
-            if not kwargs.has_key('type'):
+            if not 'type' in kwargs:
                 kwargs['type'] = str
-        elif kwargs.has_key('subopt'):
+        elif 'subopt' in kwargs:
             o = self.option_class(*args, **kwargs)
 
             oo = self.get_option(o.baseopt)
@@ -376,7 +376,7 @@ class FuseArgs(SubOptsHive):
 class FuseFormatter(SubOptIndentedFormatter):
 
     def __init__(self, **kw):
-        if not kw.has_key('indent_increment'):
+        if not 'indent_increment' in kw:
             kw['indent_increment'] = 4
         IndentedHelpFormatter.__init__(self, **kw)
 
@@ -453,16 +453,16 @@ class FuseOptParse(SubbedOptParse):
         self.mountopts = []
 
         self.fuse_args = \
-            kw.has_key('fuse_args') and kw.pop('fuse_args') or FuseArgs()
-        dsd = kw.has_key('dash_s_do') and kw.pop('dash_s_do') or 'whine'
-        self.fetch_mp = kw.has_key('fetch_mp') and bool(kw.pop('fetch_mp'))
-        if kw.has_key('standard_mods'):
+            'fuse_args' in kw and kw.pop('fuse_args') or FuseArgs()
+        dsd = 'dash_s_do' in kw and kw.pop('dash_s_do') or 'whine'
+        self.fetch_mp = 'fetch_mp' in kw and bool(kw.pop('fetch_mp'))
+        if 'standard_mods' in kw:
             smods = bool(kw.pop('standard_mods'))
         else:
             smods = True
-        if kw.has_key('fuse'):
+        if 'fuse' in kw:
             self.fuse = kw.pop('fuse')
-        if not kw.has_key('formatter'):
+        if not 'formatter' in kw:
             kw['formatter'] = FuseFormatter()
 
         SubbedOptParse.__init__(self, *args, **kw)
@@ -528,13 +528,13 @@ class FuseOptParse(SubbedOptParse):
         return o, a
 
     def add_option(self, *opts, **attrs):
-        if attrs.has_key('mountopt'):
-            if opts or attrs.has_key('subopt'):
+        if 'mountopt' in attrs:
+            if opts or 'subopt' in attrs:
                 raise OptParseError(
                   "having options or specifying the `subopt' attribute conflicts with `mountopt' attribute")
             opts = ('-o',)
             attrs['subopt'] = attrs.pop('mountopt')
-            if not attrs.has_key('dest'):
+            if not 'dest' in attrs:
                 attrs['dest'] = attrs['subopt']
 
         SubbedOptParse.add_option(self, *opts, **attrs)
@@ -703,7 +703,7 @@ def feature_needs(*feas):
                         yield f
                 continue
             ma = re.compile("has_(.*)").match(fp)
-            if ma and ma.groups()[0] in Fuse._attrs and not fmap.has_key(fp):
+            if ma and ma.groups()[0] in Fuse._attrs and not fp in fmap:
                 yield 21
                 continue
             yield fmap[fp]
@@ -778,16 +778,16 @@ class Fuse(object):
         """
 
         self.fuse_args = \
-            kw.has_key('fuse_args') and kw.pop('fuse_args') or FuseArgs()
+            'fuse_args' in kw and kw.pop('fuse_args') or FuseArgs()
 
         if compat_0_1:
             return self.__init_0_1__(*args, **kw)
 
         self.multithreaded = True
 
-        if not kw.has_key('usage'):
+        if not 'usage' in kw:
             kw['usage'] = self.fusage
-        if not kw.has_key('fuse_args'):
+        if not 'fuse_args' in kw:
             kw['fuse_args'] = self.fuse_args
         kw['fuse'] = self
 
@@ -797,7 +797,7 @@ class Fuse(object):
     def parse(self, *args, **kw):
         """Parse command line, fill `fuse_args` attribute."""
 
-        ev = kw.has_key('errex') and kw.pop('errex')
+        ev = 'errex' in kw and kw.pop('errex')
         if ev and not isinstance(ev, int):
             raise TypeError, "error exit value should be an integer"
 
@@ -825,7 +825,7 @@ class Fuse(object):
 
         for a in self._attrs:
             b = a
-            if compat_0_1 and self.compatmap.has_key(a):
+            if compat_0_1 and a in self.compatmap:
                 b = self.compatmap[a]
             if hasattr(self, b):
                 c = ''
@@ -899,7 +899,7 @@ class Fuse(object):
             self.dir_class = None
 
         def __call__(self, meth):
-            return self.mdic.has_key(meth) and self.mdic[meth] or None
+            return meth in self.mdic and self.mdic[meth] or None
 
         def _add_class_type(cls, type, inits, proxied):
 
