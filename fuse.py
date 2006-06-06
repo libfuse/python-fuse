@@ -16,58 +16,310 @@ try:
 except:
     pass
 
-from _fusemeta import __version__ 
+from _fusemeta import __version__
 from _fuse import main, FuseGetContext, FuseInvalidate, FuseError, FuseAPIVersion
 from string import join
 import sys
 from errno import *
 from os import environ
 from optparse import Option, OptionParser, OptParseError, OptionConflictError
-from optparse import IndentedHelpFormatter, SUPPRESS_HELP
-from sets import Set
+from optparse import HelpFormatter, IndentedHelpFormatter, SUPPRESS_HELP
 
 compat_0_1 = environ.has_key('FUSE_PYTHON_COMPAT') and \
              environ['FUSE_PYTHON_COMPAT'] in ('0.1', 'ALL')
 
 
+
+
 ##########
 ###
-###  Parsing related stuff.
+###  Generic suboption parsing stuff.
 ###
 ##########
 
-# XXX We should break out respective base classes from the following
-# ones, which would implement generic parsing of comma separated suboptions,
-# and would be free of FUSE specific hooks.
 
-class FuseArgs(object):
+
+class SubOptsHive(object):
+    """
+    Class for collecting unhandled suboptions.
+    """
+
+    def __init__(self):
+
+        self.optlist = set([])
+        self.optdict = {}
+
+    def _str_core(self):
+
+        sa = []
+        for k, v in self.optdict.iteritems():
+             sa.append(str(k) + '=' + str(v))
+
+        return (list(self.optlist) + sa) or ["(none)"]
+
+    def __str__(self):
+        return "< opts: " + ", ".join(self._str_core()) + " >"
+
+    def canonify(self):
+        """
+        Transform self to an equivalent canonical form:
+        delete optdict keys with False value, move optdict keys
+        with True value to optlist, stringify other values.
+        """
+
+        for k, v in self.optdict.iteritems():
+            if v == False:
+                self.optdict.pop(k)
+            elif v == True:
+                self.optdict.pop(k)
+                self.optlist.add(v)
+            else:
+                self.optdict[k] = str(v)
+
+    def filter(self, other):
+        """
+        Throw away those options which are not in the other one.
+        Returns a new instance with the rejected options.
+        """
+
+        self.canonify()
+        other.canonify()
+
+        rej = self.__class__()
+        rej.optlist = self.optlist.difference(other.optlist)
+        self.optlist.difference_update(rej.optlist)
+        for x in self.optdict.copy():
+             if x not in other.optdict:
+                 self.optdict.pop(x)
+                 rej.optdict[x] = None
+
+        return rej
+
+    def add(self, opt, val=None):
+        """Add a suboption."""
+
+        ov = opt.split('=', 1)
+        o = ov[0]
+        v = len(ov) > 1 and ov[1] or None
+
+        if (v):
+            if val != None:
+                raise AttributeError, "ambiguous option value"
+            val = v
+
+        if val == False:
+            return
+
+        if val in (None, True):
+            self.optlist.add(o)
+        else:
+            self.optdict[o] = val
+
+
+
+class SubbedOpt(Option):
+    """
+    `Option` derivative enhanced with the attribute of being a suboption of
+     some other option (like ``foo`` and ``bar`` for ``-o`` in ``-o foo,bar``).
+    """
+
+    ATTRS = Option.ATTRS + ["subopt", "subsep", "subopts_hive"]
+    ACTIONS = Option.ACTIONS + ("store_hive",)
+    STORE_ACTIONS = Option.STORE_ACTIONS + ("store_hive",)
+    TYPED_ACTIONS = Option.TYPED_ACTIONS + ("store_hive",)
+
+    def __init__(self, *opts, **attrs):
+
+       self.subopt_map = {}
+
+       if attrs.has_key("subopt"):
+           self._short_opts = []
+           self._long_opts = []
+           self._set_opt_strings(opts)
+           self.baseopt = self._short_opts[0] or self._long_opts[0]
+           opts = ()
+
+       Option.__init__(self, *opts, **attrs)
+
+    def __str__(self):
+        pf = ""
+        if hasattr(self, "subopt") and self.subopt:
+            pf = " %s...,%s,..." % (self.baseopt, self.subopt)
+        return Option.__str__(self) + pf
+
+    def _check_opt_strings(self, opts):
+        return opts
+
+    def _check_dest(self):
+        try:
+            Option._check_dest(self)
+        except IndexError:
+            if self.subopt:
+                self.dest = "__%s__%s" % (self.baseopt, self.subopt)
+                self.dest = self.dest.replace("-", "")
+            else:
+                raise
+
+    def get_opt_string(self):
+        if hasattr(self, 'subopt'):
+            return self.subopt
+        else:
+            return Option.get_opt_string(self)
+
+    def take_action(self, action, dest, opt, value, values, parser):
+        if action == "store_hive":
+            if not hasattr(values, dest) or getattr(values, dest) == None:
+                 if hasattr(self, "subopts_hive") and self.subopts_hive:
+                     hive = self.subopts_hive
+                 else:
+                     hive = parser.hive_class()
+                 setattr(values, dest, hive)
+            for o in value.split(self.subsep or ","):
+                oo = o.split('=')
+                ok = oo[0]
+                ov = None
+                if (len(oo) > 1):
+                    ov = oo[1]
+                if self.subopt_map.has_key(ok):
+                    self.subopt_map[ok].process(ok, ov, values, parser)
+                else:
+                    getattr(values, dest).add(*oo)
+            return
+        Option.take_action(self, action, dest, opt, value, values, parser)
+
+    def register_sub(self, o):
+        """Register argument a suboption for `self`."""
+
+        if self.subopt_map.has_key(o.subopt):
+            raise OptionConflictError(
+              "conflicting suboption handlers for `%s'" % o.subopt,
+              o)
+        self.subopt_map[o.subopt] = o
+
+    CHECK_METHODS = []
+    for m in Option.CHECK_METHODS:
+        #if not m == Option._check_dest:
+        if not m.__name__ == '_check_dest':
+            CHECK_METHODS.append(m)
+    CHECK_METHODS.append(_check_dest)
+
+
+
+class SubOptFormatter(HelpFormatter):
+
+    def format_option_strings(self, option):
+        if hasattr(option, "subopt") and option.subopt:
+            res = '-o ' + option.subopt
+            if option.takes_value():
+                res += "="
+                res += option.metavar or 'FOO'
+            return res
+
+        return HelpFormatter.format_option_strings(self, option)
+
+
+
+class SubOptIndentedFormatter(IndentedHelpFormatter, SubOptFormatter):
+
+    def format_option_strings(self, option):
+        return SubOptFormatter.format_option_strings(self, option)
+
+
+
+class SubbedOptParse(OptionParser):
+    """
+    This class alters / enhances `OptionParser` with *suboption handlers*.
+
+    That is, calling `sop.add_option('-x', subopt=foo)` installs a handler
+    which will be triggered if there is ``-x foo`` in the command line being
+    parsed (or, eg., ``-x foo,bar``).
+
+    Moreover, ``-x`` implicitly gets a handler which collects the unhandled
+    suboptions of ``-x`` into a `SubOptsHive` instance (accessible post festam
+    via the `x` attribute of the returned Values object). (The only exception
+    is when ``-x`` has *explicitly*  been added with action ``store_hive``.
+    This opens up the possibility of customizing the ``-x`` handler at some
+    rate.)
+
+    Suboption handlers have all the nice features of normal option handlers,
+    eg. they are displayed in the automatically generated help message
+    (and can have their own help info).
+    """
+
+    def __init__(self, *args, **kw):
+
+         if not kw.has_key('formatter'):
+             kw['formatter'] = SubOptIndentedFormatter()
+         if not kw.has_key('option_class'):
+             kw['option_class'] = SubbedOpt
+         if kw.has_key('hive_class'):
+             self.hive_class = kw.pop('hive_class')
+         else:
+             self.hive_class = SubOptsHive
+
+         OptionParser.__init__(self, *args, **kw)
+
+    def add_option(self, *args, **kwargs):
+        if kwargs.has_key('action') and kwargs['action'] == 'store_hive':
+            if kwargs.has_key('subopt'):
+                raise OptParseError(
+                  """option can't have a `subopt' attr and `action="store_hive"' at the same time""")
+            if not kwargs.has_key('type'):
+                kwargs['type'] = str
+        elif kwargs.has_key('subopt'):
+            o = self.option_class(*args, **kwargs)
+
+            oo = self.get_option(o.baseopt)
+            if oo:
+                if oo.action != "store_hive":
+                    raise OptionConflictError(
+                      "can't add subopt as option has already a handler that doesn't do `store_hive'",
+                      oo)
+            else:
+                self.add_option(o.baseopt, action='store_hive',
+                                metavar="sub1,sub2,...")
+                oo = self.get_option(o.baseopt)
+
+            oo.register_sub(o)
+
+            args = (o,)
+            kwargs = {}
+
+        return OptionParser.add_option(self, *args, **kwargs)
+
+
+
+##########
+###
+###  Parsing for FUSE.
+###
+##########
+
+
+
+class FuseArgs(SubOptsHive):
     """
     Class representing a FUSE command line.
     """
 
     fuse_modifiers = {'showhelp': '-ho',
-                      'showversion': '-V',        
+                      'showversion': '-V',
                       'foreground': '-f'}
 
     def __init__(self):
 
+        SubOptsHive.__init__(self)
+
         self.modifiers = {}
-        self.optlist = Set([])
-        self.optdict = {}
         self.mountpoint = None
 
         for m in self.fuse_modifiers:
             self.modifiers[m] = False
 
     def __str__(self):
-
-        sa = []
-        for k, v in self.optdict.iteritems():
-             sa.append(str(k) + '=' + str(v))
-
         return '\n'.join(['< on ' + str(self.mountpoint) + ':',
                           '  ' + str(self.modifiers), '  -o ']) + \
-               ',\n     '.join((list(self.optlist) + sa) or ["(none)"]) + \
+               ',\n     '.join(self._str_core()) + \
                ' >'
 
     def getmod(self, mod):
@@ -80,7 +332,6 @@ class FuseArgs(object):
         self.modifiers[mod] = False
 
     def mount_expected(self):
-
         if self.getmod('showhelp'):
             return False
         if self.getmod('showversion'):
@@ -104,154 +355,76 @@ class FuseArgs(object):
         opta.extend(self.optlist)
 
         if opta:
-            args.append("-o" + ",".join(opta)) 
-        
+            args.append("-o" + ",".join(opta))
+
         return args
 
-    def canonify(self):
+    def filter(self, other=None):
         """
-        Transform self to an equivalent canonical form:
-        delete optdict keys with False value, move optdict keys
-        with True value to optlist, stringify other values.
-        """
-
-        for k, v in self.optdict.iteritems():
-            if v == False:
-                self.optdict.pop(k)
-            elif v == True:
-                self.optdict.pop(k)
-                self.optlist.add(v)
-            else:
-                self.optdict[k] = str(v)
-
-    def filter(self, other = None):
-        """
-        Throw away those options which are not in the other one.
-        If other is `None`, `fuseoptref()` is run and its result will be used.
-        Returns a `FuseArgs` instance with the rejected options.
+        Same as for SubOptsHive, with the following difference:
+        if other is not specified, `Fuse.fuseoptref()` is run and its result
+        will be used.
         """
 
         if not other:
             other = Fuse.fuseoptref()
-        self.canonify()
-        other.canonify()
 
-        rej = self.__class__()
-        rej.optlist = self.optlist.difference(other.optlist)
-        self.optlist.difference_update(rej.optlist)
-        for x in self.optdict.copy():
-             if x not in other.optdict:
-                 self.optdict.pop(x)
-                 rej.optdict[x] = None
-
-        return rej
-
-    def add(self, opt, val=None):
-        """Add a mount option."""
-
-        ov = opt.split('=', 1)
-        o = ov[0]
-        v = len(ov) > 1 and ov[1] or None
-
-        if (v):
-            if val != None:
-                raise AttributeError, "ambiguous option value"
-            val = v
-
-        if val == False:
-            return
-
-        if val in (None, True):
-            self.optlist.add(o)
-        else:
-            self.optdict[o] = val
+        return SubOptsHive.filter(self, other)
 
 
-class FuseOpt(Option):
-    """
-    Option subclass which support having a ``mountopt`` attr instead of
-    short and long opts.
-    """
 
-    ATTRS = Option.ATTRS + ["mountopt"]
-
-    def _check_opt_strings(self, opts):
-        return opts
-
-    def _check_dest(self):
-        try:
-            Option._check_dest(self)
-        except IndexError:
-            if self.mountopt:
-                self.dest = self.mountopt
-            else:
-                raise
-
-    def get_opt_string(self):
-        if hasattr(self, 'mountopt'):
-            return self.mountopt
-        else:
-            return Option.get_opt_string(self)
-
-    CHECK_METHODS = []
-    for m in Option.CHECK_METHODS:
-        #if not m == Option._check_dest:
-        if not m.__name__ == '_check_dest':
-            CHECK_METHODS.append(m)
-    CHECK_METHODS.append(_check_dest)
-
-
-class FuseFormatter(IndentedHelpFormatter):
+class FuseFormatter(SubOptIndentedFormatter):
 
     def __init__(self, **kw):
         if not kw.has_key('indent_increment'):
-            kw['indent_increment'] = 4  
+            kw['indent_increment'] = 4
         IndentedHelpFormatter.__init__(self, **kw)
 
-    def format_option_strings(self, option):
-        if hasattr(option, "mountopt"):
-            res = '-o ' + option.mountopt
-            if option.takes_value():
-                res += "="
-                res += option.metavar or 'FOO'
-            return res
-
-        return IndentedHelpFormatter.format_option_strings(self, option)
-
-    def store_option_strings(self, parser): 
+    def store_option_strings(self, parser):
         IndentedHelpFormatter.store_option_strings(self, parser)
         # 27 is how the lib stock help appears
         self.help_position = max(self.help_position, 27)
-        self.help_width = self.width - self.help_position 
+        self.help_width = self.width - self.help_position
 
 
-class FuseOptParse(OptionParser):
+class FuseOptParse(SubbedOptParse):
     """
-    This class alters / enhances `OptionParser` in the following ways:
+    This class alters / enhances `SubbedOptParse` so that it's
+    suitable for usage with FUSE.
 
-    - Support for *mount option* handlers (instances of `FuseOpt`).
-      These match comma separated members of a ``-o`` option.
+    - When adding options, you can use the `mountopt` pseudo-attribute which
+      is equivalent with adding a subopt for option ``-o``
+      (it doesn't require an option argument).
 
-    - `parse_args()` collects unhandled mount options, see there.
+    - FUSE compatible help and version printing.
 
-    - `parse_args()` also steals a mountpoint argument.
+    - Error and exit callbacks are relaxed. In case of FUSE, the command
+      line is to be treated as a DSL [#]_. You don't wanna this module to
+      force an exit on you just because you hit a DSL syntax error.
 
     - Built-in support for conventional FUSE options (``-d``, ``-f`, ``-s``).
       The way of this can be tuned by keyword arguments, see below.
 
-    Keyword arguments
-    ----------------
- 
+    .. [#] http://en.wikipedia.org/wiki/Domain-specific_programming_language
+
+    Keyword arguments for initialization
+    ------------------------------------
+
     standard_mods
       Boolean [default is `True`].
       Enables support for the usual interpretation of the ``-d``, ``-f``
       options.
 
+    fetch_mp
+      Boolean [default is `False`].
+      Setting this option will imply that the last (non-option) argument
+      (if there is such a thing) is treated as the FUSE mountpoint.
+
     dash_s_do
       String: ``whine``, ``undef``, or ``setsingle`` [default is ``whine``].
       The ``-s`` option -- traditionally for asking for single-threadedness --
       is an oddball: single/multi threadedness of a fuse-py fs doesn't depend
-      on the FUSE command line, we have direct control over it.  
+      on the FUSE command line, we have direct control over it.
 
       Therefore we have two conflicting principles:
 
@@ -277,125 +450,95 @@ class FuseOptParse(OptionParser):
 
     def __init__(self, *args, **kw):
 
-         self.mountopts = []
+        self.mountopts = []
 
-         self.fuse_args = \
-             kw.has_key('fuse_args') and kw.pop('fuse_args') or FuseArgs()
+        self.fuse_args = \
+            kw.has_key('fuse_args') and kw.pop('fuse_args') or FuseArgs()
+        dsd = kw.has_key('dash_s_do') and kw.pop('dash_s_do') or 'whine'
+        self.fetch_mp = kw.has_key('fetch_mp') and bool(kw.pop('fetch_mp'))
+        if kw.has_key('standard_mods'):
+            smods = bool(kw.pop('standard_mods'))
+        else:
+            smods = True
+        if kw.has_key('fuse'):
+            self.fuse = kw.pop('fuse')
+        if not kw.has_key('formatter'):
+            kw['formatter'] = FuseFormatter()
 
-         dsd = kw.has_key('dash_s_do') and kw.pop('dash_s_do') or 'whine'
+        SubbedOptParse.__init__(self, *args, **kw)
 
-         smods = True
-         if kw.has_key('standard_mods'):
-             smods = kw.pop('standard_mods')
-         if smods == None:
-             smods = True
+        self.add_option('-o', action='store_hive', subopts_hive=self.fuse_args,
+                        help=SUPPRESS_HELP)
 
-         if kw.has_key('fuse'):
-             self.fuse = kw.pop('fuse')
+        if smods:
+            self.add_option('-f', action='callback',
+                            callback=lambda *a: self.fuse_args.setmod('foreground'),
+                            help=SUPPRESS_HELP)
+            self.add_option('-d', action='callback',
+                            callback=lambda *a: self.fuse_args.add('debug'),
+                            help=SUPPRESS_HELP)
 
-         if not kw.has_key('formatter'):
-             kw['formatter'] = FuseFormatter()
-         OptionParser.__init__(self, *args, **kw)
-
-         def gather_fuse_opt(option, opt_str, value, parser):
-             for o in value.split(","):
-                 oo = o.split('=')
-                 ok = oo[0]
-                 ov = None
-                 if (len(oo) > 1):
-                     ov = oo[1] 
-                 for mopt in self.mountopts:
-                     if mopt.mountopt == ok:
-                         mopt.process(ok, ov, self.values, parser)
-                         break
-                     self.fuse_args.add(*oo)
-
-         def fuse_foreground(option, opt_str, value, parser):
-             self.fuse_args.setmod('foreground')
-
-         def fuse_showhelp(option, opt_str, value, parser):
-             self.fuse_args.setmod('showhelp')
-
-         def fuse_debug(option, opt_str, value, parser):
-             self.fuse_args.add('debug')
-
-         self.add_option('-o', type=str, action='callback', callback=gather_fuse_opt, help=SUPPRESS_HELP)
-         if smods:
-             self.add_option('-f', action='callback', callback=fuse_foreground, help=SUPPRESS_HELP)
-             self.add_option('-d', action='callback', callback=fuse_debug, help=SUPPRESS_HELP)
-
-         if dsd == 'whine':
-             def dsdcb(option, opt_str, value, parser):
-                 raise RuntimeError, """
+        if dsd == 'whine':
+            def dsdcb(option, opt_str, value, parser):
+                raise RuntimeError, """
 
 ! If you want the "-s" option to work, pass
-! 
+!
 !   dash_s_do='setsingle'
-! 
+!
 ! to the Fuse constructor. See docstring of the FuseOptParse class for an
 ! explanation why is it not set by default.
 """
 
-         elif dsd == 'setsingle':
-             def dsdcb(option, opt_str, value, parser):
-                 self.fuse.multithreaded = False
+        elif dsd == 'setsingle':
+            def dsdcb(option, opt_str, value, parser):
+                self.fuse.multithreaded = False
 
-         elif dsd == 'undef':
-             dsdcb = None
-         else:
-             raise ArgumentError, "key `dash_s_do': uninterpreted value " + str(dsd)
+        elif dsd == 'undef':
+            dsdcb = None
+        else:
+            raise ArgumentError, "key `dash_s_do': uninterpreted value " + str(dsd)
 
-         if dsdcb:
-             self.add_option('-s', action='callback', callback=dsdcb,
-                             help=SUPPRESS_HELP)
-              
+        if dsdcb:
+            self.add_option('-s', action='callback', callback=dsdcb,
+                            help=SUPPRESS_HELP)
 
-    def add_option(self, *args, **kwargs):
-        if kwargs.has_key('mountopt'):
-            o = FuseOpt(*args, **kwargs)
-            for oo in self.mountopts:
-                if oo.mountopt == o.mountopt:
-                    raise OptionConflictError, "conflicting mount options: " + o.mountopt, o
-            self.mountopts.append(o)
-            args = (o,)
-            kwargs = {} 
-        return OptionParser.add_option(self, *args, **kwargs)
 
     def exit(self, status=0, msg=None):
         if msg:
             sys.stderr.write(msg)
 
     def error(self, msg):
-        OptionParser.error(self, msg)
+        SubbedOptParse.error(self, msg)
         raise OptParseError, msg
 
-    def print_help(self, file=None):
-        OptionParser.print_help(self, file)
-        print
+    def print_help(self, file=sys.stderr):
+        SubbedOptParse.print_help(self, file)
+        print >> file
         self.fuse_args.setmod('showhelp')
 
-    def print_version(self, file=None):
+    def print_version(self, file=sys.stderr):
         OptionParser.print_version(self, file)
         self.fuse_args.setmod('showversion')
 
     def parse_args(self, args=None, values=None):
-        """
-        differences to :super: :
-
-         - Return value is a triplet, where the first two
-           entries are like for :super:, the third is a
-           `FuseArgs` instance, in which unhandled mount
-           options are collected.
-
-         - One (non-option) argument is taken and passed on
-           to the `FuseArgs` instance as its `mountpoint`
-           attribute.
-        """
-
         o, a = OptionParser.parse_args(self, args, values)
-        if a: 
+        if a and self.fetch_mp:
             self.fuse_args.mountpoint = a.pop()
-        return o, a, self.fuse_args
+        return o, a
+
+    def add_option(self, *opts, **attrs):
+        if attrs.has_key('mountopt'):
+            if opts or attrs.has_key('subopt'):
+                raise OptParseError(
+                  "having options or specifying the `subopt' attribute conflicts with `mountopt' attribute")
+            opts = ('-o',)
+            attrs['subopt'] = attrs.pop('mountopt')
+            if not attrs.has_key('dest'):
+                attrs['dest'] = attrs['subopt']
+
+        SubbedOptParse.add_option(self, *opts, **attrs)
+
 
 
 ##########
@@ -403,6 +546,7 @@ class FuseOptParse(OptionParser):
 ###  The FUSE interface.
 ###
 ##########
+
 
 
 class ErrnoWrapper(object):
@@ -430,6 +574,7 @@ class Stat(object):
     pass
 
 
+
 class StatVfs(object):
     """
     Auxiliary class which can be filled up statvfs attributes.
@@ -438,16 +583,18 @@ class StatVfs(object):
 
     def __init__(self):
 
-	self.f_bsize = 0
-	self.f_frsize = 0
-	self.f_blocks = 0
-	self.f_bfree = 0
-	self.f_bavail = 0
-	self.f_files = 0
-	self.f_ffree = 0
-	self.f_favail = 0
-	self.f_flag = 0
-	self.f_namemax = 0
+        self.f_bsize = 0
+        self.f_frsize = 0
+        self.f_blocks = 0
+        self.f_bfree = 0
+        self.f_bavail = 0
+        self.f_files = 0
+        self.f_ffree = 0
+        self.f_favail = 0
+        self.f_flag = 0
+        self.f_namemax = 0
+
+
 
 class Direntry(object):
     """
@@ -483,7 +630,6 @@ class Direntry(object):
 
 
 ########## Interface for requiring certain features from your underlying FUSE library.
-
 
 def feature_needs(*feas):
     """
@@ -545,7 +691,7 @@ def feature_needs(*feas):
                         yield f
             else:
                 yield fmap[fp]
-        
+
     maxva = [0]
     while feas:
         feas = set(resolve(feas, maxva))
@@ -567,7 +713,9 @@ def feature_assert(*feas):
 
     (Note: use a ``has_foo`` type feature assertion only if lib support
     for method ``foo`` is necessary for your fs. Don't use this assertion
-    just because your fs implements ``foo``.)
+    just because your fs implements ``foo``. The usefulness of ``has_foo``
+    is limited by the fact that we can't guarantee that your FUSE kernel
+    module also supports ``foo``.)
     """
 
     fav = APIVersion()
@@ -575,17 +723,26 @@ def feature_assert(*feas):
     for fea in feas:
         fn = feature_needs(fea)
         if fav < fn:
-            raise FuseError, \
+            raise FuseError(
               "FUSE API version %d is required for feature `%s' but only %d is available" % \
-              (fn, str(fea), fav)
+              (fn, str(fea), fav))
 
 
 ############# Subclass this.
 
-
 class Fuse(object):
     """
     Python interface to FUSE.
+
+    Basic usage:
+
+    - instantiate
+
+    - add options to `parser` attribute (an instance of `FuseOptParse`)
+
+    - call `parse`
+
+    - call `main`
     """
 
     _attrs = ['getattr', 'readlink', 'readdir', 'mknod', 'mkdir',
@@ -596,19 +753,24 @@ class Fuse(object):
               'setxattr', 'removexattr', 'access']
 
     fusage = "%prog [mountpoint] [options]"
-    
+
     def __init__(self, *args, **kw):
- 
+        """
+        Not much happens here apart from initializing the `parser` attribute.
+        Arguments are forwarded to the `FuseOptParse` constructor almost
+        unchanged. (See respective documentation.)
+        """
+
         self.fuse_args = \
             kw.has_key('fuse_args') and kw.pop('fuse_args') or FuseArgs()
 
-        if compat_0_1: 
-            return self.__init_0_1__(*args, **kw) 
+        if compat_0_1:
+            return self.__init_0_1__(*args, **kw)
 
         self.multithreaded = True
-    
+
         if not kw.has_key('usage'):
-            kw['usage'] = self.fusage 
+            kw['usage'] = self.fusage
         if not kw.has_key('fuse_args'):
             kw['fuse_args'] = self.fuse_args
         kw['fuse'] = self
@@ -624,20 +786,19 @@ class Fuse(object):
             raise TypeError, "error exit value should be an integer"
 
         try:
-            o, a, fa = self.parser.parse_args(*args, **kw)
-            self.cmdline = (o, a)
+            self.cmdline = self.parser.parse_args(*args, **kw)
         except OptParseError:
           if ev:
               sys.exit(ev)
           raise
 
-        return fa
+        return self.fuse_args
 
     def main(self, args=None):
         """Enter filesystem service loop."""
 
         if compat_0_1:
-            args = self.main_0_1_preamble()      
+            args = self.main_0_1_preamble()
 
         d = {'multithreaded': self.multithreaded and 1 or 0}
         d['fuse_args'] = args or self.fuse_args.assemble()
@@ -667,7 +828,7 @@ class Fuse(object):
 
     def Invalidate(self, path):
         return FuseInvalidate(self, path)
- 
+
     def fuseoptref(cls):
         """
         Find out which options are recognized by the library.
@@ -675,21 +836,21 @@ class Fuse(object):
         options, suitable for passing on to the `filter` method of
         another `FuseArgs` instance.
         """
-    
+
         import os, re
-    
+
         pr, pw = os.pipe()
         pid = os.fork()
         if pid == 0:
              os.dup2(pw, 2)
              os.close(pr)
-              
+
              fh = cls()
              fh.fuse_args = FuseArgs()
              fh.fuse_args.setmod('showhelp')
              fh.main()
              sys.exit()
-    
+
         os.close(pw)
 
         fa = FuseArgs()
@@ -699,53 +860,53 @@ class Fuse(object):
              m = ore.search(l)
              if m:
                  fa.add(m.groups()[0])
-    
+
         fpr.close()
-        return fa 
+        return fa
 
     fuseoptref = classmethod(fuseoptref)
 
 
     class Methproxy(object):
-    
+
         def __init__(self):
-    
+
             class mpx(object):
                def __init__(self, name):
                    self.name = name
                def __call__(self, *a):
                    return getattr(a[-1], self.name)(*(a[1:-1]))
-    
+
             self.proxyclass = mpx
             self.mdic = {}
             self.file_class = None
             self.dir_class = None
-    
+
         def __call__(self, meth):
             return self.mdic.has_key(meth) and self.mdic[meth] or None
-    
+
         def _add_class_type(cls, type, inits, proxied):
-    
+
             def setter(self, xcls):
-   
+
                 setattr(self, type + '_class', xcls)
-    
+
                 for m in inits:
                     self.mdic[m] = xcls
-    
+
                 for m in proxied:
                     if hasattr(xcls, m):
                         self.mdic[m] = self.proxyclass(m)
-    
+
             setattr(cls, 'set_' + type + '_class', setter)
-                
+
         _add_class_type = classmethod(_add_class_type)
-    
+
     Methproxy._add_class_type('file', ('open', 'create'),
                               ('read', 'write', 'fsync', 'release', 'flush',
                                'fgetattr', 'ftruncate'))
     Methproxy._add_class_type('dir', ('opendir',),
-                              [ m + 'dir' for m in 'read', 'fsync', 'release'])
+                              ('readdir', 'fsyncdir', 'releasedir'))
 
 
     def __getattr__(self, meth):
@@ -757,6 +918,7 @@ class Fuse(object):
         raise AttributeError, "Fuse instance has no attribute '%s'" % meth
 
 
+
 ##########
 ###
 ###  Compat stuff.
@@ -764,8 +926,9 @@ class Fuse(object):
 ##########
 
 
+
     def __init_0_1__(self, *args, **kw):
-    
+
         self.flags = 0
         multithreaded = 0
 
@@ -782,7 +945,7 @@ class Fuse(object):
             self.mountpoint = self.optlist[0]
         else:
             self.mountpoint = None
-        
+
         # grab command-line arguments, if any.
         # Those will override whatever parameters
         # were passed to __init__ directly.
@@ -802,36 +965,39 @@ class Fuse(object):
                 except:
                     self.optlist.append(o)
 
+
     def main_0_1_preamble(self):
- 
+
         cfargs = FuseArgs()
 
         cfargs.mountpoint = self.mountpoint
- 
+
         if hasattr(self, 'debug'):
             cfargs.add('debug')
- 
+
         if hasattr(self, 'allow_other'):
             cfargs.add('allow_other')
- 
+
         if hasattr(self, 'kernel_cache'):
             cfargs.add('kernel_cache')
 
-	return cfargs.assemble()
+        return cfargs.assemble()
+
 
     def getattr_compat_0_1(self, *a):
         from os import stat_result
 
         return stat_result(self.getattr(*a))
 
+
     def statfs_compat_0_1(self, *a):
 
         oout = self.statfs(*a)
         lo = len(oout)
 
-        svf = StatVfs() 
+        svf = StatVfs()
         svf.f_bsize   = oout[0]                   # 0
-        svf.f_frsize  = oout[lo >= 8 and 7 or 0]  # 1 
+        svf.f_frsize  = oout[lo >= 8 and 7 or 0]  # 1
         svf.f_blocks  = oout[1]                   # 2
         svf.f_bfree   = oout[2]                   # 3
         svf.f_bavail  = oout[3]                   # 4
@@ -843,6 +1009,7 @@ class Fuse(object):
 
         return svf
 
+
     def readdir_compat_0_1(self, path, offset, *fh):
 
         for name, type in self.getdir(path):
@@ -850,5 +1017,6 @@ class Fuse(object):
             de.type = type
 
             yield de
+
 
     compatmap = {'readdir': 'getdir'}

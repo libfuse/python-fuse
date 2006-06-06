@@ -121,7 +121,7 @@ class Xmp(Fuse):
 #        if size == 0:
 #            # We are asked for size of the value.
 #            return len(val)
-#        return val 
+#        return val
 #
 #    def listxattr(self, path, size):
 #        # We use the "user" namespace to please XFS utils
@@ -144,14 +144,14 @@ class Xmp(Fuse):
 
             - f_bsize - preferred size of file blocks, in bytes
             - f_frsize - fundamental size of file blcoks, in bytes
-                [if you have no idea, use the same as blocksize]       
+                [if you have no idea, use the same as blocksize]
             - f_blocks - total number of blocks in the filesystem
             - f_bfree - number of free blocks
             - f_files - total number of file inodes
             - f_ffree - nunber of free file inodes
         """
 
-	return os.statvfs(self.root)
+        return os.statvfs(self.root)
 
     def main(self, *a, **kw):
 
@@ -210,7 +210,8 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
 
     server = Xmp(version="%prog " + fuse.__version__,
                  usage=usage,
-                 dash_s_do='setsingle')
+                 dash_s_do='setsingle',
+                 fetch_mp=True)
 
     server.parser.add_option(mountopt="root", metavar="PATH", default='/', type=str,
                              help="mirror filesystem from under PATH [default: %default]")

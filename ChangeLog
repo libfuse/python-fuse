@@ -1,3 +1,8 @@
+2006-06-06  Csaba Henk <csaba.henk@creo.hu>
+	 * Option parsing refactorization:
+	    - Generic suboption parsing code separated into a dedicated classes
+	    - Implement FUSE option parsing by subclassing the aforementioned
+	      classes
 2006-06-04  Csaba Henk <csaba.henk@creo.hu>
 	* Added support for the rest of FUSE methods:
 	  flush, fgetattr, ftruncate, access, getxattr, listxattr, setxattr,
