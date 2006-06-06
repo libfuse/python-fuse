@@ -1,12 +1,23 @@
-============================
-FUSE-Python bindings new API
-============================
+=============================
+FUSE-Python_ bindings new API
+=============================
+
+.. _FUSE-Python: http://fuse.sourceforge.net/wiki/index.php/FusePython
 
 :Author: Csaba Henk
+:copyright: This document has been placed in the public domain.
 
 I've made several changes on the FUSE Python interface as we knew it.
-Let's see how it effects the usage of the module -- both from the end
-user and the developer POV.
+We will review here how this effects the usage of the module -- both
+from the end user and the developer POV.
+
+*This is not a reference.* This document just wants to show the big
+picture.  If you want to write code using this module, then read this
+document first, and then take a look at the example filesystems under
+``example/`` (``example/xmp.py`` is a pretty complete demo of the usage
+of the FUSE binding). For the rest, you can get away with the usual
+resources like in-code documentation (ie., docstrings) and the code
+itself.
 
 
 .. contents::
@@ -57,8 +68,7 @@ The basic layout is the same: to start with, you get a class,
 ``fuse.Fuse``. You implement a filesystem by subclassing this class and
 add the filesystem as class methods. You can mount your filesystem class
 by calling the ``main()`` method of one of its instances.  The list of
-possible filesystem methods is available as ``fuse.Fuse._attrs``. See
-the example filesystems to find out which arguments are passed to these.
+possible filesystem methods is available as ``fuse.Fuse._attrs``. [#]_
 
 So what's new? The new API has put emphasis on the following themes:
 
@@ -76,6 +86,26 @@ So what's new? The new API has put emphasis on the following themes:
 
 Let's see how these are implemented.
 
+.. [#] See ``examples/xmp.py`` for the argument list of the fs methods.
+
+   Regarding return values: in each method, you can signal success or
+   error by returning ``0`` (*succes*), a negative number (*error*,
+   interpreted as negated errno), not returning anything (*success*) or
+   by raising (not catching) an exception (*error*, Python infers an
+   errno from the nature of the exception).
+
+   For most methods this just does the job (eg., you don't need to pass
+   back anything after handling an `mkdir` request, only success/error).
+   Some others require data being passed on from your handler to FUSE
+   (eg., `read`, `getattr`). Then just return with a suitable object (a
+   string for `read`, a stat result alike for `getattr`, cf.  `Simple
+   objects to represent system structures`_).  If the object is not
+   suitable, then FUSE will signal an EINVAL to the system; you won't
+   get feedback about it. (The badness shows up in FUSE's inner context,
+   out of Python's, so raising an exception makes no sense. We could
+   wrap some fs methods into format valifiers; currently we don't do
+   that.)
+   
 
 FUSE and the command line
 -------------------------
@@ -93,8 +123,8 @@ C library:
   parser/generator for this language to be possible to make use of it.
 
 FUSE chose the latter way. Instead of using XML or some other widely
-config format, FUSE made a simple decision: let the command line be our
-DSL -- we have to grok the command line anyway. [#]_
+used config format, FUSE made a simple decision: let the command line be
+our DSL -- we have to grok the command line anyway. [#]_
 
 So, there are two command lines in the game. One is the actual command
 line (``sys.argv``), the other is the FUSE command line: the library can
@@ -138,8 +168,6 @@ The new API does this as follows:
   ``Fuse``'s ``main()``, the FUSE command line will be inferred from
   this instance.
 
-- See *xmp.py* for a simple demonstration of all of this.  
-  
 .. [#] Originally this idea seemed as simple as there was no dedicated
    parser/generator interface provided with the library. With FUSE 2.5 we
    finally got the ``fuse_opt`` subAPI to make the command line more
@@ -185,7 +213,9 @@ Similarly, when listing directories, you have to return a sequence of
 ``fuse.Direntry`` objects which can be constructed from filenames
 (``fuse.Direntry("foofile")``).
 
-Funnily, the above sentence contains *two lies*:
+Does the above senctence make sense? I hope so. Anyway, *it's not true
+as is*. (Truth has been sacrified for making it short.) Don't worry, we
+uncover the lies immediately:
 
 - *You don't necessarily have to return a sequence*. You just have to
   return an object which implements the *iterator protocol*. In
@@ -198,7 +228,8 @@ Funnily, the above sentence contains *two lies*:
   directories, you might want to specify a unique ``offset`` value for
   the direntries. This makes it possible for the system to read your dir
   in several chunks, and in each turn, reading can be continued from
-  where it has been put off.
+  where it has been put off (for this to work, you have to be able to
+  decode an ``offset`` and find the direntry which it belongs to).
 
 
 Filehandles can also be objects if you want
@@ -266,6 +297,6 @@ options (which are not understood by the lib, according to the help
 message), and also purges out these from self, so the remainder can be
 safely passed down to FUSE.
 
-.. [#] We can argue that it's not that said. We just pass on to FUSE 
-   what we get from the user and it either eats it or blows up. Why
+.. [#] We can argue that it's not that sad. We just pass on to FUSE 
+   what we get from the user and that either eats it or blows up. Why
    would we want more sophistication?

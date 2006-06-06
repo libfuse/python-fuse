@@ -1,5 +1,6 @@
 #
 #    Copyright (C) 2001  Jeff Epler  <jepler@unpythonic.dhs.org>
+#    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu> 
 #
 #    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.

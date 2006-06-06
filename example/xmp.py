@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 #    Copyright (C) 2001  Jeff Epler  <jepler@unpythonic.dhs.org>
+#    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu> 
 #
 #    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.
@@ -9,21 +10,28 @@
 import os, sys
 from errno import *
 from stat import *
-try:
-    import fuse
-    from fuse import Fuse
-except ImportError:
-    print >> sys.stderr, """
-! If you are trying the Python example filesystem from
-! the fuse-python source directory, without installation,
-! you are suggested to link or copy build/lib.*/_fusemodule.so
-! to the root of the source tree.
-"""
-    raise
+# some spaghetti to make it usable without fuse-py being installed
+for i in True, False:
+    try:
+        import fuse
+        from fuse import Fuse
+    except ImportError:
+        if i:
+            try:
+                import _find_fuse_parts
+            except ImportError:
+                pass
+        else:
+            raise
+
 
 if not hasattr(fuse, '__version__'):
     raise RuntimeError, \
         "your fuse-py doesn't know of fuse.__version__, probably it's too old."
+
+
+fuse.feature_assert('stateful_files')
+
 
 def flag2mode(flags):
     md = {os.O_RDONLY: 'r', os.O_WRONLY: 'w', os.O_RDWR: 'w+'}
@@ -33,9 +41,6 @@ def flag2mode(flags):
         m = m.replace('w', 'a', 1)
 
     return m
-
-
-fuse.feature_assert('stateful_files')
 
 
 class Xmp(Fuse):
@@ -109,8 +114,7 @@ class Xmp(Fuse):
 
     def access(self, path, mode):
         if not os.access(self.root + path, mode):
-            import errno
-            return -errno.EACCES
+            return -EACCES
 
 #    This is how we could add stub extended attribute handlers...
 #    (We can't have ones which aptly delegate requests to the underlying fs
@@ -201,9 +205,9 @@ class Xmp(Fuse):
         return Fuse.main(self, *a, **kw)
 
 
-if __name__ == '__main__':
+def main():
 
-    usage="""
+    usage = """
 Userspace nullfs-alike: mirror the filesystem tree from some point on.
 
 """ + Fuse.fusage
@@ -225,3 +229,7 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
         sys.exit(1)
 
     server.main()
+
+
+if __name__ == '__main__':
+    main()

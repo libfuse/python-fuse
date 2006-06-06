@@ -8,7 +8,7 @@
     2004 Steven James <pyro@linuxlabs.com> and
     Linux Labs International, Inc. http://www.linuxlabs.com
 
-    
+    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu> 
 */
 
 #ifndef FUSE_VERSION
