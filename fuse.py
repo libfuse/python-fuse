@@ -649,7 +649,7 @@ class Fuse(object):
                     oxpa = ox.split("]")
                     if len(oxpa) == 2:
                        oo, o2 = oxpa
-                    oa = [o1 + o2, o1 + oo + o2]
+                       oa = [o1 + o2, o1 + oo + o2]
                  for o in oa:
                      fa.add(o)
 

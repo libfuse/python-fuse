@@ -32,7 +32,9 @@ class SubOptsHive(object):
         for k, v in self.optdict.iteritems():
              sa.append(str(k) + '=' + str(v))
 
-        return (list(self.optlist) + sa) or ["(none)"]
+        ra = (list(self.optlist) + sa) or ["(none)"]
+        ra.sort()
+        return ra 
 
     def __str__(self):
         return "< opts: " + ", ".join(self._str_core()) + " >"
