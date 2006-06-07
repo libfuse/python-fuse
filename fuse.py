@@ -635,12 +635,23 @@ class Fuse(object):
         os.close(pw)
 
         fa = FuseArgs()
-        ore = re.compile("-o\s+(\w+(?:=\w+)?)")
+        ore = re.compile("-o\s+([\w\[\]]+(?:=\w+)?)")
         fpr = os.fdopen(pr)
         for l in fpr:
              m = ore.search(l)
              if m:
-                 fa.add(m.groups()[0])
+                 o = m.groups()[0]
+                 oa = [o]
+                 # try to catch two-in-one options (like "[no]foo")
+                 opa = o.split("[")
+                 if len(opa) == 2:
+                    o1, ox = opa
+                    oxpa = ox.split("]")
+                    if len(oxpa) == 2:
+                       oo, o2 = oxpa
+                    oa = [o1 + o2, o1 + oo + o2]
+                 for o in oa:
+                     fa.add(o)
 
         fpr.close()
         return fa

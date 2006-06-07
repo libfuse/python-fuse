@@ -1,5 +1,6 @@
 2006-06-06  Csaba Henk <csaba.henk@creo.hu>
 	* Let user specify an alternative parser class/`-o' handler for Fuse. 
+	* Make Fuse.fuseoptref() detect "-o [foo]bar" like two-in-one options.
 
 2006-06-06  Csaba Henk <csaba.henk@creo.hu>
 	* Option parsing refactorization:
