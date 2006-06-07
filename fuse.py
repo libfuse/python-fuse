@@ -183,14 +183,20 @@ class FuseOptParse(SubbedOptParse):
       we have to go beyond the `fuse_args` attribute and set the respective
       Fuse attribute directly, hence violating orthogonality.
 
-      We let the fs authors make their choice: ``dash_s_do=undef`` leaves
-      this option unhandled, and the fs author can add a handler as she desires.
+      We let the fs authors make their choice: ``dash_s_do=undef`` leaves this
+      option unhandled, and the fs author can add a handler as she desires.
       ``dash_s_do=setsingle`` enables the traditional behaviour.
 
-      While using ``dash_s_do=setsingle`` usually won't be a problem, it might have
-      suprising side effects. We want fs authors should be aware of it, therefore
-      the default is the ``dash_s_do=whine`` setting which raises an exception
-      for ``-s`` and suggests the user to read this documentation.
+      While using ``dash_s_do=setsingle`` usually won't be a problem, it might
+      have suprising side effects. We want fs authors should be aware of it,
+      therefore the default is the ``dash_s_do=whine`` setting which raises an
+      exception for ``-s`` and suggests the user to read this documentation.
+
+    dash_o_handler
+      Argument should be a SubbedOpt instance (created with
+      ``action="store_hive" if you want it to be useful).
+      This lets you customize the handler of the ``-o`` option. For example,
+      you can alter or suppress the generic ``-o`` entry in help output.
     """
 
     def __init__(self, *args, **kw):
@@ -212,11 +218,16 @@ class FuseOptParse(SubbedOptParse):
             self.fuse = kw.pop('fuse')
         if not 'formatter' in kw:
             kw['formatter'] = FuseFormatter()
+        doh = 'dash_o_handler' in kw and kw.pop('dash_o_handler')
 
         SubbedOptParse.__init__(self, *args, **kw)
 
-        self.add_option('-o', action='store_hive', subopts_hive=self.fuse_args,
-                        help=SUPPRESS_HELP)
+        if doh:
+            self.add_option(doh)
+        else:
+            self.add_option('-o', action='store_hive',
+                            subopts_hive=self.fuse_args, help="mount options",
+                            metavar="opt,[opt...]")
 
         if smods:
             self.add_option('-f', action='callback',
@@ -521,8 +532,12 @@ class Fuse(object):
     def __init__(self, *args, **kw):
         """
         Not much happens here apart from initializing the `parser` attribute.
-        Arguments are forwarded to the `FuseOptParse` constructor almost
-        unchanged. (See respective documentation.)
+        Arguments are forwarded to the constructor of the parser class almost
+        unchanged.
+
+        The parser class is `FuseOptParse` unless you specify one using the
+        ``parser_class`` keyword. (See `FuseOptPatse documentation for
+        available options.)
         """
 
         self.fuse_args = \
@@ -538,8 +553,10 @@ class Fuse(object):
         if not 'fuse_args' in kw:
             kw['fuse_args'] = self.fuse_args
         kw['fuse'] = self
+        parserclass = \
+          'parser_class' in kw and kw.pop('parser_class') or FuseOptParse
 
-        self.parser = FuseOptParse(*args, **kw)
+        self.parser = parserclass(*args, **kw)
         self.methproxy = self.Methproxy()
 
     def parse(self, *args, **kw):

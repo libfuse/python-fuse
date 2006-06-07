@@ -1,5 +1,5 @@
 #
-#    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu> 
+#    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu>
 #
 #    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.
@@ -254,7 +254,7 @@ class SubbedOptParse(OptionParser):
                       oo)
             else:
                 self.add_option(o.baseopt, action='store_hive',
-                                metavar="sub1,sub2,...")
+                                metavar="sub1,[sub2,...]")
                 oo = self.get_option(o.baseopt)
 
             oo.register_sub(o)
@@ -263,4 +263,3 @@ class SubbedOptParse(OptionParser):
             kwargs = {}
 
         return OptionParser.add_option(self, *args, **kwargs)
-

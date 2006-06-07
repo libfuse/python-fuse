@@ -1,4 +1,7 @@
 2006-06-06  Csaba Henk <csaba.henk@creo.hu>
+	* Let user specify an alternative parser class/`-o' handler for Fuse. 
+
+2006-06-06  Csaba Henk <csaba.henk@creo.hu>
 	* Option parsing refactorization:
 	   - Generic suboption parsing code separated into a dedicated classes
 	   - Implement FUSE option parsing by subclassing the aforementioned
