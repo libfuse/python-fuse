@@ -489,7 +489,7 @@ open_func(const char *path, int mode)
 static int
 create_func(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-	PyObject *v = PyObject_CallFunction(create_cb, "si", path, fi->flags, mode);
+	PyObject *v = PyObject_CallFunction(create_cb, "sii", path, fi->flags, mode);
 	PROLOGUE
 
 	fi->fh = (uintptr_t) v;
