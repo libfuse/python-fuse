@@ -45,8 +45,6 @@ def flag2mode(flags):
 
 class Xmp(Fuse):
 
-    root = '/'
-
     def __init__(self, *args, **kw):
 
         Fuse.__init__(self, *args, **kw)
@@ -54,7 +52,7 @@ class Xmp(Fuse):
         # do stuff to set up your filesystem here, if you want
         #import thread
         #thread.start_new_thread(self.mythread, ())
-        pass
+        self.root = '/'
 
 #    def mythread(self):
 #
@@ -164,7 +162,7 @@ class Xmp(Fuse):
 
         server = self
 
-        class XmpFile:
+        class XmpFile(object):
 
             def __init__(self, path, flags, *mode):
                 self.file = os.fdopen(os.open(server.root + path, flags, *mode),
@@ -216,7 +214,7 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
                  usage=usage,
                  dash_s_do='setsingle')
 
-    server.parser.add_option(mountopt="root", metavar="PATH", default='/', type=str,
+    server.parser.add_option(mountopt="root", metavar="PATH", default='/',
                              help="mirror filesystem from under PATH [default: %default]")
     server.parse(values=server, errex=1)
 
