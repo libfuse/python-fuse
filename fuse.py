@@ -27,6 +27,7 @@ from fuseparts._fuse import FuseError, FuseAPIVersion
 from fuseparts.subbedopts import SubOptsHive, SubbedOptFormatter
 from fuseparts.subbedopts import SubbedOptIndentedFormatter, SubbedOptParse
 from fuseparts.subbedopts import SUPPRESS_HELP, OptParseError
+from fuseparts.setcompatwrap import set
 
 
 

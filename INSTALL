@@ -1,10 +1,22 @@
 REQUIREMENTS:
  - FUSE 2.* (tested with FUSE 2.3 and newer)
- - Python 2.3 or newer (tested with 2.4, but should work with 2.3;
-   even 2.2 should be possible to use with some additonal imports
-   [Optik/optparse, generators from future])
+ - In general, Python 2.3 or newer.
+   Version specific notes:
+   - 2.4: this is the version the code is developed with, so you can
+     expect this one to work the most smoothly. 
+   - 2.3: in general, it seems to be useable. However, the optparse 
+     module of Python 2.3 is out of date. This doesn't have fatal
+     consequences, but if you want nice help optput / version info,
+     you should either use optparse.py from 2.4 or install a recent
+     version of Optik (http://optik.sourceforge.net) (and adjust the
+     respective import statements to use optik instead of optparse).
+   - 2.2: With some minor adjustments / additional imports it should
+     be useable, too. If not else, you'll need to install Optik (see
+     previous item) and add some "from __future__ import generators"
+     statements.
  - pkg-config [http://pkgconfig.freedesktop.org/]
 
+ Additional info about the Python requirement.
 INSTALLATION:
 The best way to install this python FUSE module is:
  1. Type 'python setup.py build'. (If you have FUSE installed at a

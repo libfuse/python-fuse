@@ -1,3 +1,7 @@
+2006-07-17  Csaba Henk <csaba.henk@creo.hu>
+	* Resolve some Python 2.3 compatibility problems.
+	  Issues reported by Tienshiao Ma.
+
 2006-06-20  Csaba Henk <csaba.henk@creo.hu>
 	* Fix bogus signature upon create method invocation
 	* Nitpick about some subtleties in xmp.py

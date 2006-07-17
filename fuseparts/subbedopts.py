@@ -7,6 +7,7 @@
 
 from optparse import Option, OptionParser, OptParseError, OptionConflictError
 from optparse import HelpFormatter, IndentedHelpFormatter, SUPPRESS_HELP
+from fuseparts.setcompatwrap import set
 
 ##########
 ###
@@ -23,7 +24,7 @@ class SubOptsHive(object):
 
     def __init__(self):
 
-        self.optlist = set([])
+        self.optlist = set()
         self.optdict = {}
 
     def _str_core(self):
@@ -244,7 +245,7 @@ class SubbedOptParse(OptionParser):
                 raise OptParseError(
                   """option can't have a `subopt' attr and `action="store_hive"' at the same time""")
             if not 'type' in kwargs:
-                kwargs['type'] = str
+                kwargs['type'] = 'string'
         elif 'subopt' in kwargs:
             o = self.option_class(*args, **kwargs)
 
