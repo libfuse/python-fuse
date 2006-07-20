@@ -18,7 +18,9 @@
 #define FUSE_VERSION FUSE_MAKE_VERSION(FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION)
 #endif
 
+#ifndef FUSE_USE_VERSION
 #define FUSE_USE_VERSION 26
+#endif
 
 #include <sys/types.h>
 #include <sys/param.h>

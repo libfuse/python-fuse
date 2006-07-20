@@ -1,3 +1,9 @@
+2006-07-20  Csaba Henk <csaba.henk@creo.hu>
+	* Let user override FUSE_USE_VERSION.
+	  This might help in getting around problems with FUSE snapshots
+	  when the API is in motion.
+	  Based on report by Péter Szilágyi
+
 2006-07-17  Csaba Henk <csaba.henk@creo.hu>
 	* Resolve some Python 2.3 compatibility problems.
 	  Issues reported by Tienshiao Ma.
