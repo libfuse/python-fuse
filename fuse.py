@@ -22,7 +22,7 @@ import sys
 from errno import *
 from os import environ
 from fuseparts import __version__
-from fuseparts._fuse import main, FuseGetContext, FuseInvalidate
+from fuseparts._fuse import main, FuseGetContext, FuseInvalidate, FuseAbort
 from fuseparts._fuse import FuseError, FuseAPIVersion
 from fuseparts.subbedopts import SubOptsHive, SubbedOptFormatter
 from fuseparts.subbedopts import SubbedOptIndentedFormatter, SubbedOptParse
@@ -435,6 +435,10 @@ def feature_needs(*feas):
             'has_access':     25,
             'has_fgetattr':   25,
             'has_ftruncate':  25,
+            'has_fsinit':     ('has_init'),
+            'has_fsdestroy':  ('has_destroy'),
+            'has_init':       23,
+            'has_destroy':    23,
             '*':              '!re:^\*$'}
 
     if not feas:
@@ -526,7 +530,7 @@ class Fuse(object):
               'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
               'statfs', 'fsync', 'create', 'opendir', 'releasedir', 'fsyncdir',
               'flush', 'fgetattr', 'ftruncate', 'getxattr', 'listxattr',
-              'setxattr', 'removexattr', 'access']
+              'setxattr', 'removexattr', 'access', 'fsinit', 'fsdestroy']
 
     fusage = "%prog [mountpoint] [options]"
 
@@ -610,6 +614,9 @@ class Fuse(object):
 
     def Invalidate(self, path):
         return FuseInvalidate(self, path)
+
+    def Abort(self):
+        return FuseAbort()
 
     def fuseoptref(cls):
         """

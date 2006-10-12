@@ -66,52 +66,52 @@ class Xmp(Fuse):
 #            print "mythread: ticking"
 
     def getattr(self, path):
-        return os.lstat(self.root + path)
+        return os.lstat("." + path)
 
     def readlink(self, path):
-        return os.readlink(self.root + path)
+        return os.readlink("." + path)
 
     def readdir(self, path, offset):
-        for e in os.listdir(self.root + path):
+        for e in os.listdir("." + path):
             yield fuse.Direntry(e)
 
     def unlink(self, path):
-        os.unlink(self.root + path)
+        os.unlink("." + path)
 
     def rmdir(self, path):
-        os.rmdir(self.root + path)
+        os.rmdir("." + path)
 
     def symlink(self, path, path1):
-        os.symlink(path, self.root + path1)
+        os.symlink(path, "." + path1)
 
     def rename(self, path, path1):
-        os.rename(self.root + path, self.root + path1)
+        os.rename("." + path, "." + path1)
 
     def link(self, path, path1):
-        os.link(self.root + path, self.root + path1)
+        os.link("." + path, "." + path1)
 
     def chmod(self, path, mode):
-        os.chmod(self.root + path, mode)
+        os.chmod("." + path, mode)
 
     def chown(self, path, user, group):
-        os.chown(self.root + path, user, group)
+        os.chown("." + path, user, group)
 
     def truncate(self, path, len):
-        f = open(self.root + path, "a")
+        f = open("." + path, "a")
         f.truncate(len)
         f.close()
 
     def mknod(self, path, mode, dev):
-        os.mknod(self.root + path, mode, dev)
+        os.mknod("." + path, mode, dev)
 
     def mkdir(self, path, mode):
-        os.mkdir(self.root + path, mode)
+        os.mkdir("." + path, mode)
 
     def utime(self, path, times):
-        os.utime(self.root + path, times)
+        os.utime("." + path, times)
 
     def access(self, path, mode):
-        if not os.access(self.root + path, mode):
+        if not os.access("." + path, mode):
             return -EACCES
 
 #    This is how we could add stub extended attribute handlers...
@@ -153,52 +153,50 @@ class Xmp(Fuse):
             - f_ffree - nunber of free file inodes
         """
 
-        return os.statvfs(self.root)
+        return os.statvfs(".")
+
+    def fsinit(self):
+        os.chdir(self.root)
+
+    class XmpFile(object):
+
+        def __init__(self, path, flags, *mode):
+            self.file = os.fdopen(os.open("." + path, flags, *mode),
+                                  flag2mode(flags))
+            self.fd = self.file.fileno()
+
+        def read(self, length, offset):
+            self.file.seek(offset)
+            return self.file.read(length)
+
+        def write(self, buf, offset):
+            self.file.seek(offset)
+            self.file.write(buf)
+            return len(buf)
+
+        def release(self, flags):
+            self.file.close()
+
+        def fsync(self, isfsyncfile):
+            if isfsyncfile and hasattr(os, 'fdatasync'):
+                os.fdatasync(self.fd)
+            else:
+                os.fsync(self.fd)
+
+        def flush(self):
+            self.file.flush()
+            # cf. xmp_flush() in fusexmp_fh.c
+            os.close(os.dup(self.fd))
+
+        def fgetattr(self):
+            return os.fstat(self.fd)
+
+        def ftruncate(self, len):
+            self.file.truncate(len)
 
     def main(self, *a, **kw):
 
-        # Define the file class locally as that seems to be the easiest way to
-        # inject instance specific data into it...
-
-        server = self
-
-        class XmpFile(object):
-
-            def __init__(self, path, flags, *mode):
-                self.file = os.fdopen(os.open(server.root + path, flags, *mode),
-                                      flag2mode(flags))
-                self.fd = self.file.fileno()
-
-            def read(self, length, offset):
-                self.file.seek(offset)
-                return self.file.read(length)
-
-            def write(self, buf, offset):
-                self.file.seek(offset)
-                self.file.write(buf)
-                return len(buf)
-
-            def release(self, flags):
-                self.file.close()
-
-            def fsync(self, isfsyncfile):
-                if isfsyncfile and hasattr(os, 'fdatasync'):
-                    os.fdatasync(self.fd)
-                else:
-                    os.fsync(self.fd)
-
-            def flush(self):
-                self.file.flush()
-                # cf. xmp_flush() in fusexmp_fh.c
-                os.close(os.dup(self.fd))
-
-            def fgetattr(self):
-                return os.fstat(self.fd)
-
-            def ftruncate(self, len):
-                self.file.truncate(len)
-
-        self.file_class = XmpFile
+        self.file_class = self.XmpFile
 
         return Fuse.main(self, *a, **kw)
 
@@ -220,9 +218,9 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
 
     try:
         if server.fuse_args.mount_expected():
-            os.stat(server.root)
+            os.chdir(server.root)
     except OSError:
-        print >> sys.stderr, "can't stat root of underlying filesystem"
+        print >> sys.stderr, "can't enter root of underlying filesystem"
         sys.exit(1)
 
     server.main()

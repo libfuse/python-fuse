@@ -1,3 +1,6 @@
+2006-10-13  Csaba Henk <csaba.henk@creo.hu>
+	* Added support for init and destroy FUSE operations.
+
 2006-08-29  Csaba Henk <csaba.henk@creo.hu>
 	* Added FAQ.
 

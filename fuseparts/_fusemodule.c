@@ -38,7 +38,7 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *statfs_cb=NULL, *fsync_cb=NULL, *create_cb=NULL, *opendir_cb=NULL,
   *releasedir_cb=NULL, *fsyncdir_cb=NULL, *flush_cb=NULL, *ftruncate_cb=NULL,
   *fgetattr_cb=NULL, *getxattr_cb=NULL, *listxattr_cb=NULL, *setxattr_cb=NULL,
-  *removexattr_cb=NULL, *access_cb=NULL;
+  *removexattr_cb=NULL, *access_cb=NULL, *fsinit_cb=NULL, *fsdestroy_cb = NULL;
 
 static PyObject *Py_FuseError;
 
@@ -684,6 +684,32 @@ access_func(const char *path, int mask)
 }
 #endif
 
+#if FUSE_VERSION >= 23
+#if FUSE_VERSION >= 26
+static void *
+fsinit_func(struct fuse_conn_info *conn)
+{
+	(void)conn;
+#else
+static void *
+fsinit_func(void)
+{
+#endif
+
+	PyObject_CallFunction(fsinit_cb, "");
+
+	return NULL;
+}
+
+static void
+fsdestroy_func(void *param)
+{
+	(void)param;
+
+	PyObject_CallFunction(fsdestroy_cb, "");
+}
+#endif
+
 static void
 process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
 {
@@ -749,13 +775,14 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"open", "read", "write", "release", "statfs", "fsync",
 		"create", "opendir", "releasedir", "fsyncdir", "flush",
 	        "ftruncate", "fgetattr", "getxattr", "listxattr", "setxattr",
-	        "removexattr", "access", "fuse_args", "multithreaded", NULL
+	        "removexattr", "access", "fsinit", "fsdestroy", "fuse_args",
+		"multithreaded", NULL
 	};
 	
 	memset(&op, 0, sizeof(op));
 
 	if (!PyArg_ParseTupleAndKeywords(args, kw,
-	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi", 
+	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi", 
 	                                 kwlist, &getattr_cb, &readlink_cb,
 	                                 &readdir_cb, &mknod_cb, &mkdir_cb,
 	                                 &unlink_cb, &rmdir_cb, &symlink_cb,
@@ -769,6 +796,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	                                 &fgetattr_cb, &getxattr_cb,
 	                                 &listxattr_cb, &setxattr_cb,
 	                                 &removexattr_cb, &access_cb,
+	                                 &fsinit_cb, &fsdestroy_cb,
 	                                 &fargseq, &multithreaded))
 		return NULL;
 
@@ -820,8 +848,13 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	DO_ONE_ATTR(access);
 	DO_ONE_ATTR(create);
 #endif
+#if FUSE_VERSION >= 23
+	DO_ONE_ATTR_AS(init, fsinit);
+	DO_ONE_ATTR_AS(destroy, fsdestroy);
+#endif
 
 #undef DO_ONE_ATTR
+#undef DO_ONE_ATTR_AS
 
 	if (!fargseq || !PySequence_Check(fargseq) ||
             (fargc = PySequence_Length(fargseq)) == 0) {
