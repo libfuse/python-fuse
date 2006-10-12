@@ -1,5 +1,6 @@
 2006-10-13  Csaba Henk <csaba.henk@creo.hu>
 	* Added support for init and destroy FUSE operations.
+	* Emit a more useful error message when examples fail to import fuse.
 
 2006-08-29  Csaba Henk <csaba.henk@creo.hu>
 	* Added FAQ.
