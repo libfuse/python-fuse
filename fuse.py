@@ -22,7 +22,7 @@ import sys
 from errno import *
 from os import environ
 from fuseparts import __version__
-from fuseparts._fuse import main, FuseGetContext, FuseInvalidate, FuseAbort
+from fuseparts._fuse import main, FuseGetContext, FuseInvalidate
 from fuseparts._fuse import FuseError, FuseAPIVersion
 from fuseparts.subbedopts import SubOptsHive, SubbedOptFormatter
 from fuseparts.subbedopts import SubbedOptIndentedFormatter, SubbedOptParse
@@ -614,9 +614,6 @@ class Fuse(object):
 
     def Invalidate(self, path):
         return FuseInvalidate(self, path)
-
-    def Abort(self):
-        return FuseAbort()
 
     def fuseoptref(cls):
         """
