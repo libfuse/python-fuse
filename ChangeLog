@@ -1,3 +1,7 @@
+2006-10-14  Csaba Henk <csaba.henk@creo.hu>
+	* Make fuse-python API explicitly specifiable instead of just having
+	  a compat hook.
+
 2006-10-13  Csaba Henk <csaba.henk@creo.hu>
 	* Added support for init and destroy FUSE operations.
 	* Emit a more useful error message when examples fail to import fuse.

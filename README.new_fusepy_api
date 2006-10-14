@@ -26,6 +26,7 @@ itself.
 Old API
 ===================
 
+
 Enforcing compatibility
 -----------------------
 
@@ -33,9 +34,16 @@ There are lot of existing Python based FUSE based filesystems out there.
 They won't work with the current fuse-py code as is; however, we'd like
 to keep on using them. What can we do?
 
-Easy it is: just set ``fuse.compat_0_1`` to ``True`` before you invoke
+Easy it is: just set ``fuse.fuse_python_api`` to ``(0, 1)`` before you invoke
 your filesystem. This can be achieved externally too, by setting the
-``FUSE_PYTHON_COMPAT`` environment variable to ``0.1``.
+``FUSE_PYTHON_API`` environment variable to ``0.1``. [#]_ [#]_
+
+.. [#] Setting ``fuse.compat_0_1`` to ``True`` or having
+   ``FUSE_PYTHON_COMPAT = 0.1`` in the environment still works,
+   but it's deprecated.
+
+.. [#] Cf. `Long-term compatibility`_.
+
 
 What's incompatible, anyway?
 ----------------------------
@@ -58,7 +66,6 @@ rewrite:
   original)
 
 - the following fs methods: `getattr`, `statfs`, `getdir`.
-
 
 
 New API
@@ -263,6 +270,7 @@ attribute. I bet you don't wanna use this feature, though.
 .. [#] although it should not be an integer, as integers are treated as
    error values
 
+
 Complete support for hi-lib
 ---------------------------
 
@@ -300,3 +308,12 @@ safely passed down to FUSE.
 .. [#] We can argue that it's not that sad. We just pass on to FUSE 
    what we get from the user and that either eats it or blows up. Why
    would we want more sophistication?
+
+
+Long-term compatibility
+-----------------------
+
+You are suggested to declare explicitly that you use the current API by setting
+``fuse.fuse_python_api = (0, 2)``. This ensures that your code will keep
+working even if further API revisions take place. (At the moment this setting
+will make no difference.)

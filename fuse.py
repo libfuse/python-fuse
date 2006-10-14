@@ -21,6 +21,7 @@ from string import join
 import sys
 from errno import *
 from os import environ
+import re
 from fuseparts import __version__
 from fuseparts._fuse import main, FuseGetContext, FuseInvalidate
 from fuseparts._fuse import FuseError, FuseAPIVersion
@@ -30,10 +31,47 @@ from fuseparts.subbedopts import SUPPRESS_HELP, OptParseError
 from fuseparts.setcompatwrap import set
 
 
+##########
+###
+###  API specification API.
+###
+##########
 
-compat_0_1 = 'FUSE_PYTHON_COMPAT' in environ and \
-             environ['FUSE_PYTHON_COMPAT'] in ('0.1', 'ALL')
 
+
+def __getenv__(var, pattern = '.', trans = lambda x: x):
+    """
+    Fetch enviroment variable and optionally transform it. Return `None` if
+    variable is unset. Bail out if value of variable doesn't match (optional)
+    regex pattern.
+    """
+
+    if var not in environ:
+        return None
+    val = environ[var]
+    rpat = pattern
+    if not isinstance(rpat, type(re.compile(''))):
+        rpat = re.compile(rpat)
+    if not rpat.search(val):
+        raise RuntimeError("env var %s doesn't match required pattern %s" % \
+                           (var, `pattern`))
+    return trans(val)
+
+def get_fuse_python_api():
+    if fuse_python_api:
+        return fuse_python_api
+    elif compat_0_1:
+        # deprecated way of API specification
+        return (0,1)
+
+def get_compat_0_1():
+    return get_fuse_python_api() == (0, 1)
+
+fuse_python_api = __getenv__('FUSE_PYTHON_API', '^[\d.]+$',
+                              lambda x: tuple([int(i) for i in x.split('.')]))
+
+# deprecated way of API specification
+compat_0_1 = __getenv__('FUSE_PYTHON_COMPAT', '^(0.1|ALL)$', lambda x: True)
 
 ##########
 ###
@@ -445,7 +483,6 @@ def feature_needs(*feas):
         return fmap
 
     def resolve(args, maxva):
-        import re
 
         for fp in args:
             if isinstance(fp, int):
@@ -548,7 +585,7 @@ class Fuse(object):
         self.fuse_args = \
             'fuse_args' in kw and kw.pop('fuse_args') or FuseArgs()
 
-        if compat_0_1:
+        if get_compat_0_1():
             return self.__init_0_1__(*args, **kw)
 
         self.multithreaded = True
@@ -583,7 +620,7 @@ class Fuse(object):
     def main(self, args=None):
         """Enter filesystem service loop."""
 
-        if compat_0_1:
+        if get_compat_0_1():
             args = self.main_0_1_preamble()
 
         d = {'multithreaded': self.multithreaded and 1 or 0}
@@ -595,11 +632,11 @@ class Fuse(object):
 
         for a in self._attrs:
             b = a
-            if compat_0_1 and a in self.compatmap:
+            if get_compat_0_1() and a in self.compatmap:
                 b = self.compatmap[a]
             if hasattr(self, b):
                 c = ''
-                if compat_0_1 and hasattr(self, a + '_compat_0_1'):
+                if get_compat_0_1() and hasattr(self, a + '_compat_0_1'):
                     c = '_compat_0_1'
                 d[a] = ErrnoWrapper(getattr(self, a + c))
 
