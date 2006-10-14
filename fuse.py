@@ -37,7 +37,8 @@ from fuseparts.setcompatwrap import set
 ###
 ##########
 
-
+# The actual API version of this module
+FUSE_PYTHON_API_VERSION = (0, 2)
 
 def __getenv__(var, pattern = '.', trans = lambda x: x):
     """
@@ -67,6 +68,7 @@ def get_fuse_python_api():
 def get_compat_0_1():
     return get_fuse_python_api() == (0, 1)
 
+# API version to be used
 fuse_python_api = __getenv__('FUSE_PYTHON_API', '^[\d.]+$',
                               lambda x: tuple([int(i) for i in x.split('.')]))
 

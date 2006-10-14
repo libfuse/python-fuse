@@ -313,7 +313,8 @@ safely passed down to FUSE.
 Long-term compatibility
 -----------------------
 
-You are suggested to declare explicitly that you use the current API by setting
-``fuse.fuse_python_api = (0, 2)``. This ensures that your code will keep
-working even if further API revisions take place. (At the moment this setting
-will make no difference.)
+You are suggested to declare explicitly the API you use by setting
+``fuse.fuse_python_api`` to the value of ``fuse.FUSE_PYTHON_API_VERSION`` as
+it's definied in the fuse.py instance you code your filesystem against. This
+ensures that your code will keep working even if further API revisions take
+place.
