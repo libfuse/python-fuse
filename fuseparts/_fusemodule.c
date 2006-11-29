@@ -84,13 +84,36 @@ fi_to_py(struct fuse_file_info *fi)
 #define fetchattr_nam(st, attr, aname)					\
 	if (!(tmp = PyObject_GetAttrString(v, aname)))			\
 		goto OUT_DECREF;					\
-	if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) {			\
-		Py_DECREF(tmp);						\
-		goto OUT_DECREF;					\
+	if (PyInt_Check(tmp) && sizeof((st)->attr) <= sizeof(long)) {	\
+		/*							\
+		 * We'd rather use here PyInt_AsUnsignedLong() here	\
+		 * but there is no such thing. Closest match is		\
+		 * PyInt_AsUnsignedLongMask() but that doesn't check	\
+		 * for overflows. Duh.					\
+		 */							\
+		(st)->attr = PyInt_AsLong(tmp);				\
+		if ((unsigned long)(st)->attr > LONG_MAX) {		\
+			Py_DECREF(tmp);					\
+			goto OUT_DECREF;				\
+		}							\
+	} else {							\
+		if (PyInt_Check(tmp))					\
+			/*						\
+			 * This fnc doesn't catch overflows but I guess	\
+			 * it shouldn't overflow after passing		\
+			 * PyInt_Check() ...				\
+			 */						\
+			(st)->attr = PyInt_AsUnsignedLongLongMask(tmp);	\
+		else if (PyLong_Check(tmp))				\
+			(st)->attr = PyLong_AsUnsignedLongLong(tmp);	\
+		else {							\
+			Py_DECREF(tmp);					\
+			goto OUT_DECREF;				\
+		}							\
 	}								\
-	(st)->attr =  PyInt_Check(tmp) ? PyInt_AsLong(tmp) :		\
-		      (PyLong_Check(tmp) ? PyLong_AsLong(tmp) : 0);	\
-	Py_DECREF(tmp);
+	Py_DECREF(tmp);							\
+	if (PyErr_Occurred())						\
+		goto OUT_DECREF;
 
 #define fetchattr(st, attr)						\
 	fetchattr_nam(st, attr, #attr)
