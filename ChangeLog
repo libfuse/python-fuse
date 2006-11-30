@@ -1,3 +1,6 @@
+2006-11-30  Csaba Henk <csaba.henk@creo.hu>
+	* Further refinements on Py -> C conversion.
+
 2006-11-29  Csaba Henk <csaba.henk@creo.hu>
 	* Fix bogus conversion from Python integer types to C ones when
 	  C-ifying system structures. Bug reported by David Loveall.

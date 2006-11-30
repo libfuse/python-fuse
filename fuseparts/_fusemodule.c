@@ -81,39 +81,54 @@ fi_to_py(struct fuse_file_info *fi)
 #endif /* FUSE_VERSION >= 22 */
 
 
-#define fetchattr_nam(st, attr, aname)					\
-	if (!(tmp = PyObject_GetAttrString(v, aname)))			\
-		goto OUT_DECREF;					\
-	if (PyInt_Check(tmp) && sizeof((st)->attr) <= sizeof(long)) {	\
+/* transform a Python integer to an unsigned C numeric value */
+#define py2attr(st, attr)						\
+	if (PyInt_Check(pytmp) && sizeof((st)->attr) <= sizeof(long)) {	\
 		/*							\
 		 * We'd rather use here PyInt_AsUnsignedLong() here	\
 		 * but there is no such thing. Closest match is		\
 		 * PyInt_AsUnsignedLongMask() but that doesn't check	\
 		 * for overflows. Duh.					\
 		 */							\
-		(st)->attr = PyInt_AsLong(tmp);				\
-		if ((unsigned long)(st)->attr > LONG_MAX) {		\
-			Py_DECREF(tmp);					\
+		ctmp = PyInt_AsLong(pytmp);				\
+		if (ctmp >						\
+		    /* damn the funcall overhead...			\
+		           PyInt_GetMax() */				\
+		           LONG_MAX) {					\
+			/*						\
+			 * If the value, as unsigned, is bigger than	\
+			 * Python ints can be, then it was a negative	\
+			 * integer so bail out.				\
+			 */						\
+			Py_DECREF(pytmp);				\
 			goto OUT_DECREF;				\
 		}							\
 	} else {							\
-		if (PyInt_Check(tmp))					\
+		if (PyInt_Check(pytmp))					\
 			/*						\
 			 * This fnc doesn't catch overflows but I guess	\
 			 * it shouldn't overflow after passing		\
 			 * PyInt_Check() ...				\
 			 */						\
-			(st)->attr = PyInt_AsUnsignedLongLongMask(tmp);	\
-		else if (PyLong_Check(tmp))				\
-			(st)->attr = PyLong_AsUnsignedLongLong(tmp);	\
+			ctmp = PyInt_AsUnsignedLongLongMask(pytmp);	\
+		else if (PyLong_Check(pytmp))				\
+			ctmp = PyLong_AsUnsignedLongLong(pytmp);	\
 		else {							\
-			Py_DECREF(tmp);					\
+			Py_DECREF(pytmp);				\
 			goto OUT_DECREF;				\
 		}							\
 	}								\
-	Py_DECREF(tmp);							\
+	Py_DECREF(pytmp);						\
 	if (PyErr_Occurred())						\
+		goto OUT_DECREF;					\
+	(st)->attr = ctmp;						\
+	if ((unsigned long long)(st)->attr != ctmp)			\
 		goto OUT_DECREF;
+		
+#define fetchattr_nam(st, attr, aname)					\
+	if (!(pytmp = PyObject_GetAttrString(v, aname)))		\
+		goto OUT_DECREF;					\
+	py2attr(st, attr);
 
 #define fetchattr(st, attr)						\
 	fetchattr_nam(st, attr, #attr)
@@ -131,7 +146,8 @@ fi_to_py(struct fuse_file_info *fi)
 static int
 getattr_backend(struct stat *st, PyObject *v)
 {
-	PyObject *tmp;
+	PyObject *pytmp;
+	unsigned long long ctmp;
 
 	PROLOGUE
 
@@ -146,22 +162,17 @@ getattr_backend(struct stat *st, PyObject *v)
 	fetchattr(st, st_mtime);
 	fetchattr(st, st_ctime);
 
-#define fetchattr_soft(st, attr)				\
-	tmp = PyObject_GetAttrString(v, #attr);			\
-        if (tmp == Py_None) {					\
-		Py_DECREF(tmp);					\
-		tmp = NULL;					\
-	}							\
-	if (tmp) {						\
-		if (!(PyInt_Check(tmp) || PyLong_Check(tmp))) {	\
-			Py_DECREF(tmp);				\
-			goto OUT_DECREF;			\
-		}						\
-		(st)->attr =  PyInt_AsLong(tmp);		\
-		Py_DECREF(tmp);					\
+#define fetchattr_soft(st, attr)					\
+	pytmp = PyObject_GetAttrString(v, #attr);			\
+        if (pytmp == Py_None) {						\
+		Py_DECREF(pytmp);					\
+		pytmp = NULL;						\
+	}								\
+	if (pytmp) {							\
+		py2attr(st, attr);					\
 	}
 
-#define fetchattr_soft_d(st, attr, defa)			\
+#define fetchattr_soft_d(st, attr, defa)				\
 	fetchattr_soft(st, attr) else st->attr = defa
 
 	/*
@@ -265,7 +276,8 @@ static __inline int
 dir_add_entry(PyObject *v, fuse_dirh_t buf, fuse_dirfil_t df)
 #endif
 {
-	PyObject *tmp;
+	PyObject *pytmp;
+	unsigned long long ctmp;
 	int ret = -EINVAL;
 	struct stat st;
 	struct { off_t offset; } offs;
@@ -275,22 +287,22 @@ dir_add_entry(PyObject *v, fuse_dirh_t buf, fuse_dirfil_t df)
 	fetchattr_nam(&st, st_mode, "type");
 	fetchattr(&offs, offset);
 
-	if (!(tmp = PyObject_GetAttrString(v, "name"))) 
+	if (!(pytmp = PyObject_GetAttrString(v, "name"))) 
 		goto OUT_DECREF;		       
-	if (!PyString_Check(tmp)) {
-		Py_DECREF(tmp);
+	if (!PyString_Check(pytmp)) {
+		Py_DECREF(pytmp);
 		goto OUT_DECREF;		       
 	}					       
 
 #if FUSE_VERSION >= 23
-	ret = df(buf, PyString_AsString(tmp), &st, offs.offset);
+	ret = df(buf, PyString_AsString(pytmp), &st, offs.offset);
 #elif FUSE_VERSION >= 21
-	ret = df(buf, PyString_AsString(tmp), (st.st_mode & 0170000) >> 12,
+	ret = df(buf, PyString_AsString(pytmp), (st.st_mode & 0170000) >> 12,
                  st.st_ino);
 #else
-	ret = df(buf, PyString_AsString(tmp), (st.st_mode & 0170000) >> 12);
+	ret = df(buf, PyString_AsString(pytmp), (st.st_mode & 0170000) >> 12);
 #endif
-	Py_DECREF(tmp);
+	Py_DECREF(pytmp);
 
 OUT_DECREF:
 	Py_DECREF(v);
@@ -552,7 +564,8 @@ static int
 statfs_func(const char *dummy, struct statfs *fst)
 #endif
 {
-	PyObject *tmp;
+	PyObject *pytmp;
+	unsigned long long ctmp;
 	PyObject *v = PyObject_CallFunction(statfs_cb, "");
 
 	PROLOGUE
