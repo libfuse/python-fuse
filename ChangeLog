@@ -1,3 +1,11 @@
+2006-12-11  Csaba Henk <csaba.henk@creo.hu>
+	* Move Python locking into method handlers.
+	  This fixes LORs between FUSE and Python locking (which
+	  were due to Python's habit to release and reacquire the
+	  interpreter lock without user intervention).
+	  Bug reported by Eric Evans. Fix based on idea and code
+	  from Miklos Szeredi.
+
 2006-11-30  Csaba Henk <csaba.henk@creo.hu>
 	* Further refinements on Py -> C conversion.
 

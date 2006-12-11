@@ -41,9 +41,29 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *removexattr_cb=NULL, *access_cb=NULL, *fsinit_cb=NULL, *fsdestroy_cb = NULL;
 
 static PyObject *Py_FuseError;
+static PyInterpreterState *interp;
 
-#define PROLOGUE		\
+#define PYLOCK() if (interp) {					\
+	PyEval_AcquireLock();					\
+	_state = PyThreadState_New(interp);			\
+	PyThreadState_Swap(_state);				\
+}
+
+#define PYUNLOCK() if (interp) {				\
+	PyThreadState_Clear(_state);				\
+	PyThreadState_Swap(NULL);				\
+	PyThreadState_Delete(_state);				\
+	PyEval_ReleaseLock();					\
+}
+ 
+#define PROLOGUE(pyval)		\
 int ret = -EINVAL;		\
+PyThreadState *_state;		\
+PyObject *v;			\
+				\
+PYLOCK();			\
+				\
+v = pyval;			\
 				\
 if (!v) {			\
 	PyErr_Print();		\
@@ -62,6 +82,7 @@ if (PyInt_Check(v)) {		\
 OUT_DECREF:			\
 	Py_DECREF(v);		\
 OUT:				\
+	PYUNLOCK();		\
 	return ret;
 
 #if FUSE_VERSION >= 22
@@ -143,25 +164,6 @@ fi_to_py(struct fuse_file_info *fi)
  * with both PyInt_Check and PyLong_Check.
  */
 
-static int
-getattr_backend(struct stat *st, PyObject *v)
-{
-	PyObject *pytmp;
-	unsigned long long ctmp;
-
-	PROLOGUE
-
-	fetchattr(st, st_mode);
-	fetchattr(st, st_ino);
-	fetchattr(st, st_dev);
-	fetchattr(st, st_nlink);
-	fetchattr(st, st_uid);
-	fetchattr(st, st_gid);
-	fetchattr(st, st_size);
-	fetchattr(st, st_atime);
-	fetchattr(st, st_mtime);
-	fetchattr(st, st_ctime);
-
 #define fetchattr_soft(st, attr)					\
 	pytmp = PyObject_GetAttrString(v, #attr);			\
         if (pytmp == Py_None) {						\
@@ -175,51 +177,75 @@ getattr_backend(struct stat *st, PyObject *v)
 #define fetchattr_soft_d(st, attr, defa)				\
 	fetchattr_soft(st, attr) else st->attr = defa
 
-	/*
-	 * XXX Following fields are not necessarily available on all platforms
-	 * (were "all" stands for "POSIX-like"). Therefore we should have some
-	 * #ifdef-s around... However, they _are_ available on those platforms
-	 * where FUSE has a chance to run now and in the foreseeable future,
-	 * and we don't use autotools so we just dare to throw these in as is. 
-	 */
+#define FETCH_STAT_DATA()						\
+	fetchattr(st, st_mode);						\
+	fetchattr(st, st_ino);						\
+	fetchattr(st, st_dev);						\
+	fetchattr(st, st_nlink);					\
+	fetchattr(st, st_uid);						\
+	fetchattr(st, st_gid);						\
+	fetchattr(st, st_size);						\
+	fetchattr(st, st_atime);					\
+	fetchattr(st, st_mtime);					\
+	fetchattr(st, st_ctime);					\
+									\
+	/*								\
+	 * Following fields are not necessarily available on all	\
+	 * platforms (were "all" stands for "POSIX-like"). Therefore	\
+	 * we should have some #ifdef-s around... However, they _are_	\
+	 * available on those platforms where FUSE has a chance to	\
+	 * run now and in the foreseeable future, and we don't use	\
+	 * autotools so we just dare to throw these in as is.		\
+	 */								\
+									\
+	fetchattr_soft(st, st_rdev);					\
+	fetchattr_soft_d(st, st_blksize, 4096);				\
+	fetchattr_soft_d(st, st_blocks, (st->st_size + 511)/512)
 
-	fetchattr_soft(st, st_rdev);
-	fetchattr_soft_d(st, st_blksize, 4096);
-	fetchattr_soft_d(st, st_blocks, (st->st_size + 511)/512);
 
-#undef fetchattr_soft
-#undef fetchattr_soft_d
+static int
+getattr_func(const char *path, struct stat *st)
+{
+	PyObject *pytmp;
+	unsigned long long ctmp;
+
+	PROLOGUE( PyObject_CallFunction(getattr_cb, "s", path) )
+
+	FETCH_STAT_DATA();
 
 	ret = 0;
 
 	EPILOGUE
 }
 
-static int
-getattr_func(const char *path, struct stat *st)
-{
-	PyObject *v = PyObject_CallFunction(getattr_cb, "s", path);
-
-	return getattr_backend(st, v);
-}
-
 #if FUSE_VERSION >= 25
 static int
 fgetattr_func(const char *path, struct stat *st, struct fuse_file_info *fi)
 {
-	PyObject *v = PYO_CALLWITHFI(fi, fgetattr_cb, s, path);
+	PyObject *pytmp;
+	unsigned long long ctmp;
 
-	return getattr_backend(st, v);
+	PROLOGUE( PYO_CALLWITHFI(fi, fgetattr_cb, s, path) )
+
+	FETCH_STAT_DATA();
+
+	ret = 0;
+
+	EPILOGUE
+
 }
 #endif
+
+#undef fetchattr_soft
+#undef fetchattr_soft_d
+#undef FETCH_STAT_DATA
 
 static int
 readlink_func(const char *path, char *link, size_t size)
 {
-	PyObject *v = PyObject_CallFunction(readlink_cb, "s", path);
 	char *s;
 
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(readlink_cb, "s", path) )
 
 	if(!PyString_Check(v)) {
 		ret = -EINVAL;
@@ -237,8 +263,7 @@ readlink_func(const char *path, char *link, size_t size)
 static int
 opendir_func(const char *path, struct fuse_file_info *fi)
 {
-	PyObject *v = PyObject_CallFunction(opendir_cb, "s", path);
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(opendir_cb, "s", path) )
 
 	fi->fh = (uintptr_t) v;
 
@@ -250,12 +275,12 @@ opendir_func(const char *path, struct fuse_file_info *fi)
 static int
 releasedir_func(const char *path, struct fuse_file_info *fi)
 {
-	PyObject *v = fi_to_py(fi) ?
-  	              PyObject_CallFunction(releasedir_cb, "sN", path,
-	                                    fi_to_py(fi)) :
-		      PyObject_CallFunction(releasedir_cb, "s", path);
-
-	PROLOGUE
+	PROLOGUE(
+	  fi_to_py(fi) ?
+  	  PyObject_CallFunction(releasedir_cb, "sN", path,
+	                        fi_to_py(fi)) :
+	  PyObject_CallFunction(releasedir_cb, "s", path)
+	)
 
 	EPILOGUE
 }
@@ -263,9 +288,7 @@ releasedir_func(const char *path, struct fuse_file_info *fi)
 static int
 fsyncdir_func(const char *path, int datasync, struct fuse_file_info *fi)
 {
-	PyObject *v = PYO_CALLWITHFI(fi, fsyncdir_cb, si, path, datasync);
-
-	PROLOGUE
+	PROLOGUE( PYO_CALLWITHFI(fi, fsyncdir_cb, si, path, datasync) )
 	EPILOGUE
 }
 
@@ -315,16 +338,17 @@ static int
 readdir_func(const char *path, void *buf, fuse_fill_dir_t df, off_t off,
              struct fuse_file_info *fi)
 {
-	PyObject *v = PYO_CALLWITHFI(fi, readdir_cb, sK, path, off);
+	PyObject *iter, *w;
+
+	PROLOGUE( PYO_CALLWITHFI(fi, readdir_cb, sK, path, off) )
 #else
 static int
 readdir_func(const char *path, fuse_dirh_t buf, fuse_dirfil_t df)
 {
-	PyObject *v = PyObject_CallFunction(readdir_cb, "sK", path);
-#endif
 	PyObject *iter, *w;
 
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(readdir_cb, "sK", path) )
+#endif
 
 	iter = PyObject_GetIter(v);
 	if(!iter) {
@@ -350,90 +374,70 @@ readdir_func(const char *path, fuse_dirh_t buf, fuse_dirfil_t df)
 static int
 mknod_func(const char *path, mode_t m, dev_t d)
 {
-	PyObject *v = PyObject_CallFunction(mknod_cb, "sii", path, m, d);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(mknod_cb, "sii", path, m, d) )
 	EPILOGUE
 }
 
 static int
 mkdir_func(const char *path, mode_t m)
 {
-	PyObject *v = PyObject_CallFunction(mkdir_cb, "si", path, m);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(mkdir_cb, "si", path, m) )
 	EPILOGUE
 }
 
 static int
 unlink_func(const char *path)
 {
-	PyObject *v = PyObject_CallFunction(unlink_cb, "s", path);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(unlink_cb, "s", path) )
 	EPILOGUE
 }
 
 static int
 rmdir_func(const char *path)
 {
-	PyObject *v = PyObject_CallFunction(rmdir_cb, "s", path);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(rmdir_cb, "s", path) )
 	EPILOGUE
 }
 
 static int
 symlink_func(const char *path, const char *path1)
 {
-	PyObject *v = PyObject_CallFunction(symlink_cb, "ss", path, path1);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(symlink_cb, "ss", path, path1) )
 	EPILOGUE
 }
 
 static int
 rename_func(const char *path, const char *path1)
 {
-	PyObject *v = PyObject_CallFunction(rename_cb, "ss", path, path1);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(rename_cb, "ss", path, path1) )
 	EPILOGUE
 }
 
 static int
 link_func(const char *path, const char *path1)
 {
-	PyObject *v = PyObject_CallFunction(link_cb, "ss", path, path1);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(link_cb, "ss", path, path1) )
 	EPILOGUE
 }
 
 static int
 chmod_func(const char *path, mode_t m) 
 {
-	PyObject *v = PyObject_CallFunction(chmod_cb, "si", path, m);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(chmod_cb, "si", path, m) )
 	EPILOGUE
 }
 
 static int
 chown_func(const char *path, uid_t u, gid_t g) 
 {
-	PyObject *v = PyObject_CallFunction(chown_cb, "sii", path, u, g);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(chown_cb, "sii", path, u, g) )
 	EPILOGUE
 }
 
 static int
 truncate_func(const char *path, off_t length)
 {
-	PyObject *v = PyObject_CallFunction(truncate_cb, "sK", path, length);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(truncate_cb, "sK", path, length) )
 	EPILOGUE
 }
 
@@ -441,9 +445,7 @@ truncate_func(const char *path, off_t length)
 static int
 ftruncate_func(const char *path, off_t length, struct fuse_file_info *fi)
 {
-	PyObject *v = PYO_CALLWITHFI(fi, ftruncate_cb, sK, path, length);
-
-	PROLOGUE
+	PROLOGUE( PYO_CALLWITHFI(fi, ftruncate_cb, sK, path, length) )
 	EPILOGUE
 }
 #endif
@@ -453,10 +455,9 @@ utime_func(const char *path, struct utimbuf *u)
 {
 	int actime = u ? u->actime : time(NULL);
 	int modtime = u ? u->modtime : actime;
-	PyObject *v = PyObject_CallFunction(utime_cb, "s(ii)",
-	                                    path, actime, modtime);
-
-	PROLOGUE
+	PROLOGUE(
+	  PyObject_CallFunction(utime_cb, "s(ii)", path, actime, modtime)
+	)
 	EPILOGUE
 }
 
@@ -469,9 +470,7 @@ static int
 read_func(const char *path, char *buf, size_t s, off_t off)
 #endif
 {
-	PyObject *v = PYO_CALLWITHFI(fi, read_cb, siK, path, s, off);
-
-	PROLOGUE
+	PROLOGUE( PYO_CALLWITHFI(fi, read_cb, siK, path, s, off) )
 
 	if(PyString_Check(v)) {
 		if(PyString_Size(v) > s)
@@ -492,9 +491,7 @@ static int
 write_func(const char *path, const char *buf, size_t t, off_t off)
 #endif
 {
-	PyObject *v = PYO_CALLWITHFI(fi, write_cb, ss#K, path, buf, t, off);
-
-	PROLOGUE
+	PROLOGUE( PYO_CALLWITHFI(fi, write_cb, ss#K, path, buf, t, off) )
 	EPILOGUE
 }
 
@@ -502,12 +499,11 @@ write_func(const char *path, const char *buf, size_t t, off_t off)
 static int
 open_func(const char *path, struct fuse_file_info *fi)
 {
-	PyObject *v = PyObject_CallFunction(open_cb, "si", path, fi->flags);
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(open_cb, "si", path, fi->flags) )
 
 	fi->fh = (uintptr_t) v;
-
-	return 0;
+	ret = 0;
+	goto OUT;
 
 	EPILOGUE
 }
@@ -515,9 +511,7 @@ open_func(const char *path, struct fuse_file_info *fi)
 static int
 open_func(const char *path, int mode)
 {
-	PyObject *v = PyObject_CallFunction(open_cb, "si", path, mode);
-	PROLOGUE
-
+	PROLOGUE( PyObject_CallFunction(open_cb, "si", path, mode) )
 	EPILOGUE
 }
 #endif
@@ -526,12 +520,13 @@ open_func(const char *path, int mode)
 static int
 create_func(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-	PyObject *v = PyObject_CallFunction(create_cb, "sii", path, fi->flags, mode);
-	PROLOGUE
+	PROLOGUE(
+	  PyObject_CallFunction(create_cb, "sii", path, fi->flags, mode)
+	)
 
 	fi->fh = (uintptr_t) v;
-
-	return 0;
+	ret = 0;
+	goto OUT;
 
 	EPILOGUE
 }
@@ -541,18 +536,18 @@ create_func(const char *path, mode_t mode, struct fuse_file_info *fi)
 static int
 release_func(const char *path, struct fuse_file_info *fi)
 {
-	PyObject *v = fi_to_py(fi) ?
-		      PyObject_CallFunction(release_cb, "siN", path, fi->flags,
-		                            fi_to_py(fi)) :
-		      PyObject_CallFunction(release_cb, "si", path, fi->flags);
+	PROLOGUE(
+	  fi_to_py(fi) ?
+	  PyObject_CallFunction(release_cb, "siN", path, fi->flags,
+	                        fi_to_py(fi)) :
+	  PyObject_CallFunction(release_cb, "si", path, fi->flags)
+	)
 #else
 static int
 release_func(const char *path, int flags)
 {
-	PyObject *v = PyObject_CallFunction(release_cb, "si", path, flags);
+	PROLOGUE( PyObject_CallFunction(release_cb, "si", path, flags) )
 #endif
-	PROLOGUE
-
 	EPILOGUE
 }
 
@@ -566,10 +561,7 @@ statfs_func(const char *dummy, struct statfs *fst)
 {
 	PyObject *pytmp;
 	unsigned long long ctmp;
-	PyObject *v = PyObject_CallFunction(statfs_cb, "");
-
-	PROLOGUE
-
+	PROLOGUE( PyObject_CallFunction(statfs_cb, "") )
 
 	fetchattr(fst, f_bsize);
 #if FUSE_VERSION >= 25
@@ -601,9 +593,7 @@ static int
 fsync_func(const char *path, int datasync)
 #endif
 {
-	PyObject *v = PYO_CALLWITHFI(fi, fsync_cb, si, path, datasync);
-
-	PROLOGUE
+	PROLOGUE( PYO_CALLWITHFI(fi, fsync_cb, si, path, datasync) )
 	EPILOGUE
 }
 
@@ -615,19 +605,14 @@ static int
 flush_func(const char *path)
 #endif
 {
-	PyObject *v = PYO_CALLWITHFI(fi, flush_cb, s, path);
-
-	PROLOGUE
+	PROLOGUE( PYO_CALLWITHFI(fi, flush_cb, s, path) )
 	EPILOGUE
 }
 
 static int
 getxattr_func(const char *path, const char *name, char *value, size_t size)
 {
-	PyObject *v = PyObject_CallFunction(getxattr_cb, "ssi", path, name,
-	                                    size);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(getxattr_cb, "ssi", path, name, size) )
 
 	if(PyString_Check(v)) {
 		if(PyString_Size(v) > size)
@@ -642,11 +627,9 @@ getxattr_func(const char *path, const char *name, char *value, size_t size)
 static int
 listxattr_func(const char *path, char *list, size_t size)
 {
-	PyObject *v = PyObject_CallFunction(listxattr_cb, "si", path, size);
 	PyObject *iter, *w;
 	char *lx = list;
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(listxattr_cb, "si", path, size) )
 
 	iter = PyObject_GetIter(v);
 	if(!iter) {
@@ -693,19 +676,17 @@ static int
 setxattr_func(const char *path, const char *name, const char *value,
               size_t size, int flags)
 {
-	PyObject *v = PyObject_CallFunction(setxattr_cb, "sss#i", path, name,
-                                            value, size, flags);
-
-	PROLOGUE
+	PROLOGUE(
+	  PyObject_CallFunction(setxattr_cb, "sss#i", path, name, value, size,
+	                        flags)
+	)
 	EPILOGUE
 }
 
 static int
 removexattr_func(const char *path, const char *name)
 {
-	PyObject *v = PyObject_CallFunction(removexattr_cb, "ss", path, name);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(removexattr_cb, "ss", path, name) )
 	EPILOGUE
 }
 
@@ -713,9 +694,7 @@ removexattr_func(const char *path, const char *name)
 static int
 access_func(const char *path, int mask)
 {
-	PyObject *v = PyObject_CallFunction(access_cb, "si", path, mask);
-
-	PROLOGUE
+	PROLOGUE( PyObject_CallFunction(access_cb, "si", path, mask) )
 	EPILOGUE
 }
 #endif
@@ -731,8 +710,11 @@ static void *
 fsinit_func(void)
 {
 #endif
+	PyThreadState *_state;
 
+	PYLOCK();
 	PyObject_CallFunction(fsinit_cb, "");
+	PYUNLOCK();
 
 	return NULL;
 }
@@ -740,48 +722,27 @@ fsinit_func(void)
 static void
 fsdestroy_func(void *param)
 {
+	PyThreadState *_state;
 	(void)param;
 
+	PYLOCK();
 	PyObject_CallFunction(fsdestroy_cb, "");
+	PYUNLOCK();
 }
 #endif
-
-static void
-process_cmd(struct fuse *f, struct fuse_cmd *cmd, void *data)
-{
-	PyInterpreterState *interp = (PyInterpreterState *) data;
-	PyThreadState *state;
-
-	PyEval_AcquireLock();
-	state = PyThreadState_New(interp);
-	PyThreadState_Swap(state);
-#if FUSE_VERSION >= 22
-	fuse_process_cmd(f, cmd);
-#else
-	__fuse_process_cmd(f, cmd);
-#endif
-	PyThreadState_Clear(state);
-	PyThreadState_Swap(NULL);
-	PyThreadState_Delete(state);
-	PyEval_ReleaseLock();
-}
 
 static int
 pyfuse_loop_mt(struct fuse *f)
 {
-	PyInterpreterState *interp;
 	PyThreadState *save;
 	int err;
 
 	PyEval_InitThreads();
 	interp = PyThreadState_Get()->interp;
 	save = PyEval_SaveThread();
-#if FUSE_VERSION >= 22
-	err = fuse_loop_mt_proc(f, process_cmd, interp);
-#else
-	err = __fuse_loop_mt(f, process_cmd, interp);
-#endif
+	fuse_loop_mt(f);
 	/* Not yet reached: */
+	printf("it is!\n");
 	PyEval_RestoreThread(save);
 
 	return(err);
@@ -943,9 +904,11 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		 
 	if (multithreaded)
 		err = pyfuse_loop_mt(fuse);
-	else
+	else {
+		interp = NULL;
 		err = fuse_loop(fuse);
-	
+	}
+
 #if FUSE_VERSION >= 26
 	fuse_teardown(fuse, fmp);	
 #elif FUSE_VERSION >= 22
