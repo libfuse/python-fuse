@@ -43,7 +43,11 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
 static PyObject *Py_FuseError;
 static PyInterpreterState *interp;
 
-#define PYLOCK() if (interp) {					\
+#ifdef WITH_THREAD
+
+#define PYLOCK()						\
+PyThreadState *_state;						\
+if (interp) {							\
 	PyEval_AcquireLock();					\
 	_state = PyThreadState_New(interp);			\
 	PyThreadState_Swap(_state);				\
@@ -56,9 +60,13 @@ static PyInterpreterState *interp;
 	PyEval_ReleaseLock();					\
 }
  
+#else
+#define PYLOCK()
+#define PYUNLOCK()
+#endif /* WITH_THREAD */
+
 #define PROLOGUE(pyval)		\
 int ret = -EINVAL;		\
-PyThreadState *_state;		\
 PyObject *v;			\
 				\
 PYLOCK();			\
@@ -710,8 +718,6 @@ static void *
 fsinit_func(void)
 {
 #endif
-	PyThreadState *_state;
-
 	PYLOCK();
 	PyObject_CallFunction(fsinit_cb, "");
 	PYUNLOCK();
@@ -722,7 +728,6 @@ fsinit_func(void)
 static void
 fsdestroy_func(void *param)
 {
-	PyThreadState *_state;
 	(void)param;
 
 	PYLOCK();
@@ -734,16 +739,16 @@ fsdestroy_func(void *param)
 static int
 pyfuse_loop_mt(struct fuse *f)
 {
+	int err = -1;
+#ifdef WITH_THREAD
 	PyThreadState *save;
-	int err;
 
 	PyEval_InitThreads();
 	interp = PyThreadState_Get()->interp;
 	save = PyEval_SaveThread();
-	fuse_loop_mt(f);
-	/* Not yet reached: */
-	printf("it is!\n");
+	err = fuse_loop_mt(f);
 	PyEval_RestoreThread(save);
+#endif
 
 	return(err);
 }
@@ -901,7 +906,20 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 
 		return (NULL);
 	}
-		 
+
+#ifndef WITH_THREAD
+	if (multithreaded) {
+		multithreaded = 0;
+#if PY_MAJOR_VERSION > 2 || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION >= 5)
+		PyErr_WarnEx(NULL, "Python thread support not available, "
+		                   "enforcing single-threaded operation", 1);
+#else
+		PyErr_Warn(NULL, "Python thread support not available, "
+		                 "enforcing single-threaded operation");
+#endif
+	}
+#endif
+
 	if (multithreaded)
 		err = pyfuse_loop_mt(fuse);
 	else {

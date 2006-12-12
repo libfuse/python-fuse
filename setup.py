@@ -39,6 +39,14 @@ extra_cflags = [x for x in cflags.split() if x[0:2] != '-I']
 libdirs = [x[2:] for x in libs.split() if x[0:2] == '-L']
 libsonly = [x[2:] for x in libs.split() if x[0:2] == '-l']
 
+try:
+    import thread
+except ImportError:
+    # if our Python doesn't have thread support, we enforce
+    # linking against libpthread so that libfuse's pthread
+    # related symbols won't be undefined
+    libsonly.append("pthread")
+
 # include_dirs=[]
 # libraries=[]
 # runtime_library_dirs=[]
