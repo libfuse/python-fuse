@@ -46,7 +46,7 @@ static PyInterpreterState *interp;
 #ifdef WITH_THREAD
 
 #define PYLOCK()						\
-PyThreadState *_state;						\
+PyThreadState *_state = NULL;					\
 if (interp) {							\
 	PyEval_AcquireLock();					\
 	_state = PyThreadState_New(interp);			\

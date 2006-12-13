@@ -1,3 +1,6 @@
+2006-12-13  Csaba Henk <csaba.henk@creo.hu>
+	* Hush some warnings.
+
 2006-12-12  Csaba Henk <csaba.henk@creo.hu>
 	* Clean up threading related code a bit, let module be compiled for
 	  Pythons with no threading support
