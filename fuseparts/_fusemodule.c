@@ -22,13 +22,8 @@
 #define FUSE_USE_VERSION 26
 #endif
 
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/mount.h>
-#include <stdint.h>
-#include <time.h>
 #include <Python.h>
-#include "fuse.h"
+#include <fuse.h>
 
 static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *mknod_cb=NULL, *mkdir_cb=NULL, *unlink_cb=NULL, *rmdir_cb=NULL,
