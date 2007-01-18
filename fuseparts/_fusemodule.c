@@ -8,7 +8,7 @@
     2004 Steven James <pyro@linuxlabs.com> and
     Linux Labs International, Inc. http://www.linuxlabs.com
 
-    Copyright (C) 2006  Csaba Henk  <csaba.henk@creo.hu> 
+    Copyright (C) 2006-2007  Csaba Henk  <csaba.henk@creo.hu> 
 */
 
 #ifndef FUSE_VERSION
@@ -986,12 +986,15 @@ FuseGetContext(PyObject *self, PyObject *args)
 
 	num = PyInt_FromLong(fc->uid);
 	PyDict_SetItemString(ret, "uid", num);	
+	Py_XDECREF( num );
 
 	num = PyInt_FromLong(fc->gid);
 	PyDict_SetItemString(ret, "gid", num);	
+	Py_XDECREF( num );
 
 	num = PyInt_FromLong(fc->pid);
 	PyDict_SetItemString(ret, "pid", num);	
+	Py_XDECREF( num );
 
 	return(ret);
 }
