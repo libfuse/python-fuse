@@ -1,4 +1,8 @@
 2007-01-19  Csaba Henk <csaba.henk@creo.hu>
+	* Handle float stat fields of OS X.
+	  Patch based on code by Paul Fredrickson.
+
+2007-01-19  Csaba Henk <csaba.henk@creo.hu>
 	* Fix memory leak in FuseGetContext().
 	  Patch by Marek Isalski.
 

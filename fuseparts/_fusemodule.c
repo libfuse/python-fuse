@@ -106,6 +106,17 @@ fi_to_py(struct fuse_file_info *fi)
 
 
 /* transform a Python integer to an unsigned C numeric value */
+
+/* Aux macro for MACs: os.stat() is float on MAC! */
+#ifdef __APPLE__
+#define __MAC_pytmp_TO_ctmp__						\
+	else if (PyFloat_Check(pytmp))					\
+		ctmp =							\
+		  (unsigned long long)PyFloat_AsDouble(pytmp);
+#else
+#define __MAC_pytmp_TO_ctmp__
+#endif
+
 #define py2attr(st, attr)						\
 	if (PyInt_Check(pytmp) && sizeof((st)->attr) <= sizeof(long)) {	\
 		/*							\
@@ -137,6 +148,7 @@ fi_to_py(struct fuse_file_info *fi)
 			ctmp = PyInt_AsUnsignedLongLongMask(pytmp);	\
 		else if (PyLong_Check(pytmp))				\
 			ctmp = PyLong_AsUnsignedLongLong(pytmp);	\
+		__MAC_pytmp_TO_ctmp__					\
 		else {							\
 			Py_DECREF(pytmp);				\
 			goto OUT_DECREF;				\
