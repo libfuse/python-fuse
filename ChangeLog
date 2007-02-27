@@ -1,4 +1,7 @@
-2007-01-19  Csaba Henk <csaba.henk@creo.hu>
+2007-02-27  Csaba Henk <csaba.henk@creo.hu>
+	* Document file class inistantiation via OPEN vs. via CREATE.
+
+2007-02-24  Csaba Henk <csaba.henk@creo.hu>
 	* Handle float stat fields of OS X.
 	  Patch based on code by Paul Fredrickson.
 
