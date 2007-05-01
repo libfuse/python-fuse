@@ -1,3 +1,6 @@
+2007-05-01  Csaba Henk <csaba.henk@creo.hu>
+	* Make keep_cache and direct_io settable filewise.
+
 2007-03-13  Csaba Henk <csaba.henk@creo.hu>
 	* Check for float stat fields everywhere, not only on OS X. 
 

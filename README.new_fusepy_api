@@ -267,9 +267,20 @@ and there are not that many of them (there is no `writedir`). You can
 register a directory class by setting the ``dir_class`` ``Fuse``
 attribute. I bet you don't wanna use this feature, though.
 
+Another use of filehandles is that they can be used for adjusting some FUSE
+tunables *filewise*. That is, if you return a  py-filehandle object so that it
+has a ``keep_cache`` or ``direct_io`` attribute of value ``True``, then the
+respective option will be enabled for the given file by FUSE [#]_. As a special
+case, if the returned py-filehandle is an instance of ``fuse.FuseFileInfo``, it
+will be used for nothing else apart from testing the ``keep_cache`` /
+``direct_io`` attributes (after which it will be disposed).
+
 .. [#] although it should not be an integer, as integers are treated as
    error values
 
+.. [#] See the meaning of these options eg.  in standard FUSE help message,
+   which you can read by, eg., running ``example/xmp.py -h`` from the root of
+   the FUSE Python bindings source tree.
 
 Complete support for hi-lib
 ---------------------------

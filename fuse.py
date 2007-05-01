@@ -429,6 +429,16 @@ class Direntry(object):
         self.ino = 0
 
 
+
+class FuseFileInfo:
+
+    def __init__(self, keep = False, direct_io = False):
+        self.keep = keep
+        self.direct_io = direct_io
+
+
+
+
 ########## Interface for requiring certain features from your underlying FUSE library.
 
 def feature_needs(*feas):
@@ -468,6 +478,10 @@ def feature_needs(*feas):
     fmap = {'stateful_files': 22,
             'stateful_dirs':  23,
             'stateful_io':    ('stateful_files', 'stateful_dirs'),
+            'stateful_files_keep_cache': 23,
+            'stateful_files_direct_io': 23,
+            'keep_cache':     ('stateful_files_keep_cache',),
+            'direct_io':      ('stateful_files_direct_io',),
             'has_opendir':    ('stateful_dirs',),
             'has_releasedir': ('stateful_dirs',),
             'has_fsyncdir':   ('stateful_dirs',),
@@ -640,13 +654,39 @@ class Fuse(object):
                 c = ''
                 if get_compat_0_1() and hasattr(self, a + '_compat_0_1'):
                     c = '_compat_0_1'
-                d[a] = ErrnoWrapper(getattr(self, a + c))
+                d[a] = ErrnoWrapper(self.lowwrap(a + c))
 
         try:
             main(**d)
         except FuseError:
             if args or self.fuse_args.mount_expected():
                 raise
+
+    def lowwrap(self, fname):
+        """
+	Wraps the fname method when the C code expects a different kind of
+	callback than we have in the fusepy API. (The wrapper is usually for
+	performing some checks or transfromations which could be done in C but
+	is simpler if done in Python.)
+
+	Currently `open` and `create` are wrapped: a boolean flag is added
+	which indicates if the result is to be kept during the opened file's
+	lifetime or can be thrown away. Namely, it's considered disposable
+	if it's an instance of FuseFileInfo.
+        """
+        fun = getattr(self, fname)
+
+        if not fname in ('open', 'create'):
+            return fun
+
+        def wrap(*a, **kw):
+            res = fun(*a, **kw)
+            if not res or type(res) == type(0):
+                return res
+            else:
+                return (res, type(res) != FuseFileInfo)
+
+        return wrap
 
     def GetContext(self):
         return FuseGetContext(self)

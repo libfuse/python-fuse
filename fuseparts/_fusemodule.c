@@ -506,9 +506,31 @@ write_func(const char *path, const char *buf, size_t t, off_t off)
 static int
 open_func(const char *path, struct fuse_file_info *fi)
 {
+	PyObject *pytmp, *pytmp1;
+
 	PROLOGUE( PyObject_CallFunction(open_cb, "si", path, fi->flags) )
 
-	fi->fh = (uintptr_t) v;
+	pytmp = PyTuple_GetItem(v, 0);
+
+#if FUSE_VERSION >= 23
+	pytmp1 = PyObject_GetAttrString(pytmp, "keep_cache");
+	if (pytmp1) {
+		fi->keep_cache = PyObject_IsTrue(pytmp1);
+		Py_DECREF(pytmp1);
+	}
+	pytmp1 = PyObject_GetAttrString(pytmp, "direct_io");
+	if (pytmp1) {
+		fi->direct_io = PyObject_IsTrue(pytmp1);
+		Py_DECREF(pytmp1);
+	}
+
+	if (PyObject_IsTrue(PyTuple_GetItem(v, 1)))
+#endif
+	{
+		Py_INCREF(pytmp);
+		fi->fh = (uintptr_t) pytmp;
+	}
+
 	ret = 0;
 	goto OUT;
 
@@ -527,11 +549,30 @@ open_func(const char *path, int mode)
 static int
 create_func(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
+	PyObject *pytmp, *pytmp1;
+
 	PROLOGUE(
 	  PyObject_CallFunction(create_cb, "sii", path, fi->flags, mode)
 	)
 
-	fi->fh = (uintptr_t) v;
+	pytmp = PyTuple_GetItem(v, 0);
+
+	pytmp1 = PyObject_GetAttrString(pytmp, "keep_cache");
+	if (pytmp1) {
+		fi->keep_cache = PyObject_IsTrue(pytmp1);
+		Py_DECREF(pytmp1);
+	}
+	pytmp1 = PyObject_GetAttrString(pytmp, "direct_io");
+	if (pytmp1) {
+		fi->direct_io = PyObject_IsTrue(pytmp1);
+		Py_DECREF(pytmp1);
+	}
+
+	if (PyObject_IsTrue(PyTuple_GetItem(v, 1))) {
+		Py_INCREF(pytmp);
+		fi->fh = (uintptr_t) pytmp;
+	}
+
 	ret = 0;
 	goto OUT;
 
@@ -734,6 +775,16 @@ fsdestroy_func(void *param)
 	PYUNLOCK();
 }
 #endif
+
+static int
+lock_func(const char *path, struct fuse_file_info *fi, int cmd,
+          struct flock *lock)
+{
+    (void) path;
+
+    return ulockmgr_op(fi->fh, cmd, lock, &fi->lock_owner,
+                       sizeof(fi->lock_owner));
+}
 
 static int
 pyfuse_loop_mt(struct fuse *f)
