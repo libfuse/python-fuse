@@ -777,16 +777,6 @@ fsdestroy_func(void *param)
 #endif
 
 static int
-lock_func(const char *path, struct fuse_file_info *fi, int cmd,
-          struct flock *lock)
-{
-    (void) path;
-
-    return ulockmgr_op(fi->fh, cmd, lock, &fi->lock_owner,
-                       sizeof(fi->lock_owner));
-}
-
-static int
 pyfuse_loop_mt(struct fuse *f)
 {
 	int err = -1;
