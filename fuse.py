@@ -365,7 +365,14 @@ class ErrnoWrapper(object):
 
 ########### Custom objects for transmitting system structures to FUSE
 
-class Stat(object):
+class FuseStruct(object):
+
+    def __init__(self, **kw):
+        for k in kw:
+             setattr(self, k, kw[k])
+
+
+class Stat(FuseStruct):
     """
     Auxiliary class which can be filled up stat attributes.
     The attributes are undefined by default.
@@ -375,13 +382,13 @@ class Stat(object):
 
 
 
-class StatVfs(object):
+class StatVfs(FuseStruct):
     """
     Auxiliary class which can be filled up statvfs attributes.
     The attributes are 0 by default.
     """
 
-    def __init__(self):
+    def __init__(self, **kw):
 
         self.f_bsize = 0
         self.f_frsize = 0
@@ -394,9 +401,10 @@ class StatVfs(object):
         self.f_flag = 0
         self.f_namemax = 0
 
+        FuseStruct.__init__(self, **kw)
 
 
-class Direntry(object):
+class Direntry(FuseStruct):
     """
     Auxiliary class for carrying directory entry data.
     Initialized with `name`. Further attributes (each
@@ -421,21 +429,24 @@ class Direntry(object):
     attributes doesn't make sense in that context.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, **kw):
 
         self.name = name
         self.offset = 0
         self.type = 0
         self.ino = 0
 
+        FuseStruct.__init__(self, **kw)
 
 
-class FuseFileInfo:
+class FuseFileInfo(FuseStruct):
 
-    def __init__(self, keep = False, direct_io = False):
-        self.keep = keep
-        self.direct_io = direct_io
+    def __init__(self, **kw):
 
+        self.keep = False
+        self.direct_io = False
+
+        FuseStruct.__init__(self, **kw)
 
 
 
