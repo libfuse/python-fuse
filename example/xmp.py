@@ -180,14 +180,19 @@ class Xmp(Fuse):
         def release(self, flags):
             self.file.close()
 
+        def _fflush(self):
+            if 'w' in self.file.mode or 'a' in self.file.mode:
+                self.file.flush()
+
         def fsync(self, isfsyncfile):
+            self._fflush()
             if isfsyncfile and hasattr(os, 'fdatasync'):
                 os.fdatasync(self.fd)
             else:
                 os.fsync(self.fd)
 
         def flush(self):
-            self.file.flush()
+            self._fflush()
             # cf. xmp_flush() in fusexmp_fh.c
             os.close(os.dup(self.fd))
 
