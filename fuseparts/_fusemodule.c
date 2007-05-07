@@ -11,6 +11,16 @@
     Copyright (C) 2006-2007  Csaba Henk  <csaba.henk@creo.hu> 
 */
 
+/* 
+ * Local Variables:
+ * indent-tabs-mode: t
+ * c-basic-offset: 8
+ * End:
+ * Changed by David McNab (david@rebirthing.co.nz) to work with recent pythons.
+ * Namely, replacing PyTuple_* with PySequence_*, and checking numerical values
+ * with both PyInt_Check and PyLong_Check.
+ */
+
 #ifndef FUSE_VERSION
 #ifndef FUSE_MAKE_VERSION
 #define FUSE_MAKE_VERSION(maj, min)  ((maj) * 10 + (min))
@@ -33,7 +43,8 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *statfs_cb=NULL, *fsync_cb=NULL, *create_cb=NULL, *opendir_cb=NULL,
   *releasedir_cb=NULL, *fsyncdir_cb=NULL, *flush_cb=NULL, *ftruncate_cb=NULL,
   *fgetattr_cb=NULL, *getxattr_cb=NULL, *listxattr_cb=NULL, *setxattr_cb=NULL,
-  *removexattr_cb=NULL, *access_cb=NULL, *fsinit_cb=NULL, *fsdestroy_cb = NULL;
+  *removexattr_cb=NULL, *access_cb=NULL, *lock_cb = NULL, *fsinit_cb=NULL,
+  *fsdestroy_cb = NULL;
 
 static PyObject *Py_FuseError;
 static PyInterpreterState *interp;
@@ -161,16 +172,6 @@ fi_to_py(struct fuse_file_info *fi)
 #define fetchattr(st, attr)						\
 	fetchattr_nam(st, attr, #attr)
 
-/* 
- * Local Variables:
- * indent-tabs-mode: t
- * c-basic-offset: 8
- * End:
- * Changed by David McNab (david@rebirthing.co.nz) to work with recent pythons.
- * Namely, replacing PyTuple_* with PySequence_*, and checking numerical values
- * with both PyInt_Check and PyLong_Check.
- */
-
 #define fetchattr_soft(st, attr)					\
 	pytmp = PyObject_GetAttrString(v, #attr);			\
         if (pytmp == Py_None) {						\
@@ -180,6 +181,11 @@ fi_to_py(struct fuse_file_info *fi)
 	if (pytmp) {							\
 		py2attr(st, attr);					\
 	}
+
+/*
+ * Following macros are only for getattr-alikes, we undef them after
+ * the getattr type functions.
+ */
 
 #define fetchattr_soft_d(st, attr, defa)				\
 	fetchattr_soft(st, attr) else st->attr = defa
@@ -243,7 +249,6 @@ fgetattr_func(const char *path, struct stat *st, struct fuse_file_info *fi)
 }
 #endif
 
-#undef fetchattr_soft
 #undef fetchattr_soft_d
 #undef FETCH_STAT_DATA
 
@@ -776,6 +781,55 @@ fsdestroy_func(void *param)
 }
 #endif
 
+static inline PyObject *
+lock_func_i(const char *path, struct fuse_file_info *fi, int cmd,
+            struct flock *lock)
+{
+	PyObject *pyargs, *pykw = NULL, *v = NULL;
+
+	pyargs =
+	fi_to_py(fi) ?
+	Py_BuildValue("(siKO)", path, cmd, fi->lock_owner, fi_to_py(fi)) :
+	Py_BuildValue("(siK)", path, cmd, fi->lock_owner); 
+	if (! pyargs)
+		goto out;
+
+	pykw = Py_BuildValue("{sisKsKsi}",
+	                     "l_type",  lock->l_type,
+	                     "l_start", lock->l_start,
+	                     "l_len",   lock->l_len,
+	                     "l_pid",   lock->l_pid);
+	if (! pykw)
+		goto out;
+
+	v = PyObject_Call(lock_cb, pyargs, pykw);
+
+out:
+	Py_XDECREF(pyargs);
+	Py_XDECREF(pykw);
+
+	return v;
+}
+
+static int
+lock_func(const char *path, struct fuse_file_info *fi, int cmd,
+          struct flock *lock)
+{
+	PyObject *pytmp;
+	unsigned long long ctmp;
+
+	PROLOGUE( lock_func_i(path, fi, cmd, lock) )
+
+	fetchattr_soft(lock, l_type);
+	fetchattr_soft(lock, l_start);
+	fetchattr_soft(lock, l_len);
+	fetchattr_soft(lock, l_pid);
+
+	ret = 0;
+
+	EPILOGUE
+}
+
 static int
 pyfuse_loop_mt(struct fuse *f)
 {
@@ -817,14 +871,14 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"open", "read", "write", "release", "statfs", "fsync",
 		"create", "opendir", "releasedir", "fsyncdir", "flush",
 	        "ftruncate", "fgetattr", "getxattr", "listxattr", "setxattr",
-	        "removexattr", "access", "fsinit", "fsdestroy", "fuse_args",
-		"multithreaded", NULL
+	        "removexattr", "access", "lock", "fsinit", "fsdestroy",
+		"fuse_args", "multithreaded", NULL
 	};
 	
 	memset(&op, 0, sizeof(op));
 
 	if (!PyArg_ParseTupleAndKeywords(args, kw,
-	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi", 
+	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi", 
 	                                 kwlist, &getattr_cb, &readlink_cb,
 	                                 &readdir_cb, &mknod_cb, &mkdir_cb,
 	                                 &unlink_cb, &rmdir_cb, &symlink_cb,
@@ -837,7 +891,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	                                 &flush_cb, &ftruncate_cb,
 	                                 &fgetattr_cb, &getxattr_cb,
 	                                 &listxattr_cb, &setxattr_cb,
-	                                 &removexattr_cb, &access_cb,
+	                                 &removexattr_cb, &access_cb, &lock_cb,
 	                                 &fsinit_cb, &fsdestroy_cb,
 	                                 &fargseq, &multithreaded))
 		return NULL;
@@ -889,6 +943,9 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	DO_ONE_ATTR(fgetattr);
 	DO_ONE_ATTR(access);
 	DO_ONE_ATTR(create);
+#endif
+#if FUSE_VERSION >= 26
+	DO_ONE_ATTR(lock);
 #endif
 #if FUSE_VERSION >= 23
 	DO_ONE_ATTR_AS(init, fsinit);

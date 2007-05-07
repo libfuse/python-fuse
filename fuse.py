@@ -381,7 +381,6 @@ class Stat(FuseStruct):
     pass
 
 
-
 class StatVfs(FuseStruct):
     """
     Auxiliary class which can be filled up statvfs attributes.
@@ -439,6 +438,18 @@ class Direntry(FuseStruct):
         FuseStruct.__init__(self, **kw)
 
 
+class Flock(FuseStruct):
+    """
+    Class for representing flock structures (cf. fcntl(3)).
+    
+    It makes sense to give values to the `l_type`, `l_start`,
+    `l_len`, `l_pid` attributes (`l_whence` is not used by
+    FUSE, see ``fuse.h``).
+    """
+ 
+    pass
+ 
+ 
 class FuseFileInfo(FuseStruct):
 
     def __init__(self, **kw):
@@ -502,6 +513,7 @@ def feature_needs(*feas):
             'has_ftruncate':  25,
             'has_fsinit':     ('has_init'),
             'has_fsdestroy':  ('has_destroy'),
+            'has_lock':       26,
             'has_init':       23,
             'has_destroy':    23,
             '*':              '!re:^\*$'}
@@ -594,7 +606,8 @@ class Fuse(object):
               'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
               'statfs', 'fsync', 'create', 'opendir', 'releasedir', 'fsyncdir',
               'flush', 'fgetattr', 'ftruncate', 'getxattr', 'listxattr',
-              'setxattr', 'removexattr', 'access', 'fsinit', 'fsdestroy']
+              'setxattr', 'removexattr', 'access', 'lock', 'fsinit',
+              'fsdestroy']
 
     fusage = "%prog [mountpoint] [options]"
 
@@ -761,8 +774,8 @@ class Fuse(object):
             class mpx(object):
                def __init__(self, name):
                    self.name = name
-               def __call__(self, *a):
-                   return getattr(a[-1], self.name)(*(a[1:-1]))
+               def __call__(self, *a, **kw):
+                   return getattr(a[-1], self.name)(*(a[1:-1]), **kw)
 
             self.proxyclass = mpx
             self.mdic = {}
@@ -791,7 +804,7 @@ class Fuse(object):
 
     Methproxy._add_class_type('file', ('open', 'create'),
                               ('read', 'write', 'fsync', 'release', 'flush',
-                               'fgetattr', 'ftruncate'))
+                               'fgetattr', 'ftruncate', 'lock'))
     Methproxy._add_class_type('dir', ('opendir',),
                               ('readdir', 'fsyncdir', 'releasedir'))
 
