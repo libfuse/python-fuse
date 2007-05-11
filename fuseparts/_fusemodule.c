@@ -482,7 +482,11 @@ static int
 read_func(const char *path, char *buf, size_t s, off_t off)
 #endif
 {
+#if PY_VERSION_HEX < 0x02050000
 	PROLOGUE( PYO_CALLWITHFI(fi, read_cb, siK, path, s, off) )
+#else
+	PROLOGUE( PYO_CALLWITHFI(fi, read_cb, snK, path, s, off) )
+#endif
 
 	if(PyString_Check(v)) {
 		if(PyString_Size(v) > s)
@@ -665,7 +669,11 @@ flush_func(const char *path)
 static int
 getxattr_func(const char *path, const char *name, char *value, size_t size)
 {
+#if PY_VERSION_HEX < 0x02050000
 	PROLOGUE( PyObject_CallFunction(getxattr_cb, "ssi", path, name, size) )
+#else
+	PROLOGUE( PyObject_CallFunction(getxattr_cb, "ssn", path, name, size) )
+#endif
 
 	if(PyString_Check(v)) {
 		if(PyString_Size(v) > size)
@@ -682,8 +690,11 @@ listxattr_func(const char *path, char *list, size_t size)
 {
 	PyObject *iter, *w;
 	char *lx = list;
+#if PY_VERSION_HEX < 0x02050000
 	PROLOGUE( PyObject_CallFunction(listxattr_cb, "si", path, size) )
-
+#else
+	PROLOGUE( PyObject_CallFunction(listxattr_cb, "sn", path, size) )
+#endif
 	iter = PyObject_GetIter(v);
 	if(!iter) {
 		PyErr_Print();
