@@ -287,7 +287,8 @@ Complete support for hi-lib
 
 The Python bindings support all highlevel (pathname based) methods of
 the Fuse library as of API revision 26, including `create`, `access`,
-`flush` and *extended attributes*.
+`flush`, extended attributes, advisory file locking, nanosec precise
+setting of acces/modify times, and `bmap`.
 
 
 Reflection

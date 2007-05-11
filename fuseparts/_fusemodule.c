@@ -43,8 +43,8 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *statfs_cb=NULL, *fsync_cb=NULL, *create_cb=NULL, *opendir_cb=NULL,
   *releasedir_cb=NULL, *fsyncdir_cb=NULL, *flush_cb=NULL, *ftruncate_cb=NULL,
   *fgetattr_cb=NULL, *getxattr_cb=NULL, *listxattr_cb=NULL, *setxattr_cb=NULL,
-  *removexattr_cb=NULL, *access_cb=NULL, *lock_cb = NULL, *fsinit_cb=NULL,
-  *fsdestroy_cb = NULL;
+  *removexattr_cb=NULL, *access_cb=NULL, *lock_cb = NULL, *utimens_cb = NULL,
+  *bmap_cb = NULL, *fsinit_cb=NULL, *fsdestroy_cb = NULL;
 
 static PyObject *Py_FuseError;
 static PyInterpreterState *interp;
@@ -792,6 +792,7 @@ fsdestroy_func(void *param)
 }
 #endif
 
+#if FUSE_VERSION >= 26
 static inline PyObject *
 lock_func_i(const char *path, struct fuse_file_info *fi, int cmd,
             struct flock *lock)
@@ -842,6 +843,48 @@ lock_func(const char *path, struct fuse_file_info *fi, int cmd,
 }
 
 static int
+utimens_func(const char *path, const struct timespec ts[2])
+{
+	PROLOGUE(
+	  PyObject_CallFunction(utimens_cb, "siiii", path,
+	                        ts[0].tv_sec, ts[0].tv_nsec,
+	                        ts[1].tv_sec, ts[1].tv_nsec)
+	)
+
+	EPILOGUE
+}
+
+static int
+bmap_func(const char *path, size_t blocksize, uint64_t *idx)
+{
+	PyObject *pytmp;
+	unsigned long long ctmp;
+	struct { uint64_t idx; } idxwrapper;
+
+	PROLOGUE(
+#if PY_VERSION_HEX < 0x02050000
+	  PyObject_CallFunction(bmap_cb, "siK", path, blocksize, *idx)
+#else
+	  PyObject_CallFunction(bmap_cb, "snK", path, blocksize, *idx)
+#endif
+	)
+
+	/*
+	 * We can make use of our py -> C numeric conversion macro with some
+	 * customization of the parameters...
+	 */
+	pytmp = v;
+	Py_INCREF(pytmp);
+	py2attr(&idxwrapper, idx);
+
+	*idx = idxwrapper.idx;
+	ret = 0;
+
+	EPILOGUE
+}
+#endif
+
+static int
 pyfuse_loop_mt(struct fuse *f)
 {
 	int err = -1;
@@ -882,14 +925,14 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"open", "read", "write", "release", "statfs", "fsync",
 		"create", "opendir", "releasedir", "fsyncdir", "flush",
 	        "ftruncate", "fgetattr", "getxattr", "listxattr", "setxattr",
-	        "removexattr", "access", "lock", "fsinit", "fsdestroy",
-		"fuse_args", "multithreaded", NULL
+	        "removexattr", "access", "lock", "utimens", "bmap",
+		"fsinit", "fsdestroy", "fuse_args", "multithreaded", NULL
 	};
 	
 	memset(&op, 0, sizeof(op));
 
 	if (!PyArg_ParseTupleAndKeywords(args, kw,
-	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi", 
+	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi", 
 	                                 kwlist, &getattr_cb, &readlink_cb,
 	                                 &readdir_cb, &mknod_cb, &mkdir_cb,
 	                                 &unlink_cb, &rmdir_cb, &symlink_cb,
@@ -902,7 +945,8 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	                                 &flush_cb, &ftruncate_cb,
 	                                 &fgetattr_cb, &getxattr_cb,
 	                                 &listxattr_cb, &setxattr_cb,
-	                                 &removexattr_cb, &access_cb, &lock_cb,
+	                                 &removexattr_cb, &access_cb,
+	                                 &lock_cb, &utimens_cb, &bmap_cb,
 	                                 &fsinit_cb, &fsdestroy_cb,
 	                                 &fargseq, &multithreaded))
 		return NULL;
@@ -957,6 +1001,8 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 #endif
 #if FUSE_VERSION >= 26
 	DO_ONE_ATTR(lock);
+	DO_ONE_ATTR(utimens);
+	DO_ONE_ATTR(bmap);
 #endif
 #if FUSE_VERSION >= 23
 	DO_ONE_ATTR_AS(init, fsinit);

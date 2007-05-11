@@ -450,6 +450,15 @@ class Flock(FuseStruct):
     pass
  
  
+class Timespec(FuseStruct):
+    """
+    Cf. struct timespec in time.h:
+    http://www.opengroup.org/onlinepubs/009695399/basedefs/time.h.html
+    """
+
+    pass
+
+
 class FuseFileInfo(FuseStruct):
 
     def __init__(self, **kw):
@@ -514,6 +523,8 @@ def feature_needs(*feas):
             'has_fsinit':     ('has_init'),
             'has_fsdestroy':  ('has_destroy'),
             'has_lock':       26,
+            'has_utimens':    26,
+            'has_bmap':       26,
             'has_init':       23,
             'has_destroy':    23,
             '*':              '!re:^\*$'}
@@ -606,8 +617,8 @@ class Fuse(object):
               'chown', 'truncate', 'utime', 'open', 'read', 'write', 'release',
               'statfs', 'fsync', 'create', 'opendir', 'releasedir', 'fsyncdir',
               'flush', 'fgetattr', 'ftruncate', 'getxattr', 'listxattr',
-              'setxattr', 'removexattr', 'access', 'lock', 'fsinit',
-              'fsdestroy']
+              'setxattr', 'removexattr', 'access', 'lock', 'utimens', 'bmap',
+              'fsinit', 'fsdestroy']
 
     fusage = "%prog [mountpoint] [options]"
 
@@ -700,15 +711,20 @@ class Fuse(object):
         """
         fun = getattr(self, fname)
 
-        if not fname in ('open', 'create'):
-            return fun
-
-        def wrap(*a, **kw):
-            res = fun(*a, **kw)
-            if not res or type(res) == type(0):
-                return res
-            else:
-                return (res, type(res) != FuseFileInfo)
+        if fname in ('open', 'create'):
+            def wrap(*a, **kw):
+                res = fun(*a, **kw)
+                if not res or type(res) == type(0):
+                    return res
+                else:
+                    return (res, type(res) != FuseFileInfo)
+        elif fname == 'utimens':
+            def wrap(path, acc_sec, acc_nsec, mod_sec, mod_nsec):
+                ts_acc = Timespec(tv_sec = acc_sec, tv_nsec = acc_nsec)
+                ts_mod = Timespec(tv_sec = mod_sec, tv_nsec = mod_nsec)
+                return fun(path, ts_acc, ts_mod)
+        else:
+            wrap = fun
 
         return wrap
 

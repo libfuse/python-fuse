@@ -114,6 +114,13 @@ class Xmp(Fuse):
     def utime(self, path, times):
         os.utime("." + path, times)
 
+#    The following utimens method would do the same as the above utime method.
+#    We can't make it better though as the Python stdlib doesn't know of
+#    subsecond preciseness in acces/modify times.
+#  
+#    def utimens(self, path, ts_acc, ts_mod):
+#      os.utime("." + path, (ts_acc.tv_sec, ts_mod.tv_sec))
+
     def access(self, path, mode):
         if not os.access("." + path, mode):
             return -EACCES
