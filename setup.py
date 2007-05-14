@@ -4,7 +4,11 @@
 # This setup.py based on that of shout-python (py bindings for libshout,
 # part of the icecast project, http://svn.xiph.org/icecast/trunk/shout-python)
 
-from distutils.core import setup, Extension
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
+from distutils.core import Extension
 import os
 import sys
 
