@@ -1,0 +1,2 @@
+recursive-include *.py *.c *.h *.tmpl
+include [A-Z]*

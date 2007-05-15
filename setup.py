@@ -6,8 +6,10 @@
 
 try:
     from setuptools import setup
+    from setuptools.dist import Distribution
 except ImportError:
     from distutils.core import setup
+    from distutils.dist import Distribution
 from distutils.core import Extension
 import os
 import sys
@@ -23,6 +25,22 @@ Programming Language :: C
 Programming Language :: Python
 Topic :: System :: Filesystems
 """
+
+class MyDistribution(Distribution):
+    """
+    Obnoxious hack to enforce the packager to generate
+    the to-be-generated files
+    """
+
+    def run_command(self, command):
+        if command == 'sdist':
+            for f in ('Changelog', 'README.new_fusepy_api.html'):
+                 if not os.path.exists(f):
+                     raise RuntimeError, 'file ' + `f` + \
+                           " doesn't exist, please generate it before creating a source distribution"
+
+        return Distribution.run_command(self, command)
+
 
 # write default fuse.pc path into environment if PKG_CONFIG_PATH is unset
 #if not os.environ.has_key('PKG_CONFIG_PATH'):
@@ -91,4 +109,5 @@ setup (name = 'fuse-python',
        maintainer_email = 'csaba.henk@creo.hu',
        ext_modules = [fusemodule],
        packages = ["fuseparts"],
-       py_modules=["fuse"])
+       py_modules=["fuse"],
+       distclass = MyDistribution)
