@@ -228,14 +228,14 @@ class FuseOptParse(SubbedOptParse):
       option unhandled, and the fs author can add a handler as she desires.
       ``dash_s_do=setsingle`` enables the traditional behaviour.
 
-      While using ``dash_s_do=setsingle`` usually won't be a problem, it might
-      have suprising side effects. We want fs authors should be aware of it,
-      therefore the default is the ``dash_s_do=whine`` setting which raises an
-      exception for ``-s`` and suggests the user to read this documentation.
+      Using ``dash_s_do=setsingle`` is not problematic at all, but we want fs
+      authors be aware of the particularity of ``-s``, therefore the default is
+      the ``dash_s_do=whine`` setting which raises an exception for ``-s`` and
+      suggests the user to read this documentation.
 
     dash_o_handler
       Argument should be a SubbedOpt instance (created with
-      ``action="store_hive" if you want it to be useful).
+      ``action="store_hive"`` if you want it to be useful).
       This lets you customize the handler of the ``-o`` option. For example,
       you can alter or suppress the generic ``-o`` entry in help output.
     """
@@ -699,15 +699,15 @@ class Fuse(object):
 
     def lowwrap(self, fname):
         """
-	Wraps the fname method when the C code expects a different kind of
-	callback than we have in the fusepy API. (The wrapper is usually for
-	performing some checks or transfromations which could be done in C but
-	is simpler if done in Python.)
+        Wraps the fname method when the C code expects a different kind of
+        callback than we have in the fusepy API. (The wrapper is usually for
+        performing some checks or transfromations which could be done in C but
+        is simpler if done in Python.)
 
-	Currently `open` and `create` are wrapped: a boolean flag is added
-	which indicates if the result is to be kept during the opened file's
-	lifetime or can be thrown away. Namely, it's considered disposable
-	if it's an instance of FuseFileInfo.
+        Currently `open` and `create` are wrapped: a boolean flag is added
+        which indicates if the result is to be kept during the opened file's
+        lifetime or can be thrown away. Namely, it's considered disposable
+        if it's an instance of FuseFileInfo.
         """
         fun = getattr(self, fname)
 
