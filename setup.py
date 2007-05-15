@@ -14,6 +14,16 @@ import sys
 
 from fuseparts import __version__ 
 
+classifiers = """\
+Development Status :: 4 - Beta
+Intended Audience :: Developers
+License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
+Operating System :: POSIX
+Programming Language :: C
+Programming Language :: Python
+Topic :: System :: Filesystems
+"""
+
 # write default fuse.pc path into environment if PKG_CONFIG_PATH is unset
 #if not os.environ.has_key('PKG_CONFIG_PATH'):
 #  os.environ['PKG_CONFIG_PATH'] = '/usr/local/lib/pkgconfig'
@@ -62,10 +72,19 @@ fusemodule = Extension('fuseparts._fusemodule', sources = ['fuseparts/_fusemodul
                   libraries = libsonly)
 
 # data_files = []
+if sys.version_info < (2, 3):
+    _setup = setup
+    def setup(**kwargs):
+        if kwargs.has_key("classifiers"):
+            del kwargs["classifiers"]
+        _setup(**kwargs)
 setup (name = 'fuse-python',
        version = __version__,
        description = 'Bindings for FUSE',
-       url = 'http://fuse.sourceforge.net',
+       classifiers = filter(None, classifiers.split("\n")),
+       license = 'LGPL',
+       platforms = ['posix'],
+       url = 'http://fuse.sourceforge.net/wiki/index.php/FusePython',
        author = 'Jeff Epler',
        author_email = 'jepler@unpythonic.dhs.org',
        maintainer = 'Csaba Henk',
