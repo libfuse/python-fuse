@@ -6,7 +6,7 @@ ddd = realpath(join(dirname(sys.argv[0]), '..'))
 
 for d in [ddd, '.']: 
     for p in glob.glob(join(d, 'build', 'lib.*')):
-         sys.path.append(p)
+        sys.path.insert(0, p)
 
 try:
     import fuse

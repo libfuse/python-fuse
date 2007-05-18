@@ -7,19 +7,13 @@
 #
 
 import os, stat, errno
-# some spaghetti to make it usable without fuse-py being installed
-for i in True, False:
-    try:
-        import fuse
-        from fuse import Fuse
-    except ImportError:
-        if i:
-            try:
-                import _find_fuse_parts
-            except ImportError:
-                pass
-        else:
-            raise
+# pull in some spaghetti to make this stuff work without fuse-py being installed
+try:
+    import _find_fuse_parts
+except ImportError:
+    pass
+import fuse
+from fuse import Fuse
 
 
 if not hasattr(fuse, '__version__'):
