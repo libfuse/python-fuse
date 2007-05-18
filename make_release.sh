@@ -31,6 +31,6 @@ fi
 
 hg log --style util/fusepychangelog.tmpl -r $log_to:0 > Changelog
 rst2html.py --stylesheet util/voidspace-fusepy.css README.new_fusepy_api > README.new_fusepy_api.html
-(hg manif | grep -v '^\.' && echo Changelog && echo README.new_fusepy_api.html) > MANIFEST
+(hg manif | grep -v '^\.' && echo Changelog && echo README.new_fusepy_api.html) | sed 's/^/include /' > MANIFEST.in
 python setup.py sdist
 python setup.py bdist_egg
