@@ -24,8 +24,6 @@ if not hasattr(fuse, '__version__'):
     raise RuntimeError, \
         "your fuse-py doesn't know of fuse.__version__, probably it's too old."
 
-# This setting is optional, but it ensures that this class will keep
-# working after a future API revision
 fuse.fuse_python_api = (0, 2)
 
 fuse.feature_assert('stateful_files', 'has_init')

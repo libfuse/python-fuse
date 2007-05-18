@@ -633,6 +633,24 @@ class Fuse(object):
         available options.)
         """
 
+        if not fuse_python_api and not compat_0_1:
+            raise RuntimeError, __name__ + """.fuse_python_api not defined.
+
+! Please define """ + __name__ + """.fuse_python_api internally (eg.
+! 
+! (1)  """ + __name__ + """.fuse_python_api = """ + `FUSE_PYTHON_API_VERSION` + """
+! 
+! ) or in the enviroment (eg. 
+! 
+! (2)  FUSE_PYTHON_API=0.1
+! 
+! ).
+!
+! If you are actually developing a filesystem, probably (1) is the way to go.
+! If you are using a filesystem written before 2007 Q2, probably (2) is what
+! you want."
+"""
+
         self.fuse_args = \
             'fuse_args' in kw and kw.pop('fuse_args') or FuseArgs()
 
