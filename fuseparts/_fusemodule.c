@@ -173,13 +173,8 @@ fi_to_py(struct fuse_file_info *fi)
 	fetchattr_nam(st, attr, #attr)
 
 #define fetchattr_soft(st, attr)					\
-	pytmp = PyObject_GetAttrString(v, #attr);			\
-        if (pytmp == Py_None) {						\
-		Py_DECREF(pytmp);					\
-		pytmp = NULL;						\
-	}								\
-	if (pytmp) {							\
-		py2attr(st, attr);					\
+	if (PyObject_HasAttrString(v, #attr)) {				\
+		fetchattr(st, attr);					\
 	}
 
 /*
