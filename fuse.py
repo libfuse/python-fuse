@@ -378,7 +378,17 @@ class Stat(FuseStruct):
     The attributes are undefined by default.
     """
 
-    pass
+    def __init__(self, **kw):
+        self.st_mode  = None
+        self.st_ino   = None
+        self.st_dev   = None
+        self.st_nlink = None
+        self.st_uid   = None
+        self.st_gid   = None
+        self.st_size  = None
+        self.st_atime = None
+        self.st_mtime = None
+        self.st_ctime = None
 
 
 class StatVfs(FuseStruct):
@@ -389,15 +399,15 @@ class StatVfs(FuseStruct):
 
     def __init__(self, **kw):
 
-        self.f_bsize = 0
-        self.f_frsize = 0
-        self.f_blocks = 0
-        self.f_bfree = 0
-        self.f_bavail = 0
-        self.f_files = 0
-        self.f_ffree = 0
-        self.f_favail = 0
-        self.f_flag = 0
+        self.f_bsize   = 0
+        self.f_frsize  = 0
+        self.f_blocks  = 0
+        self.f_bfree   = 0
+        self.f_bavail  = 0
+        self.f_files   = 0
+        self.f_ffree   = 0
+        self.f_favail  = 0
+        self.f_flag    = 0
         self.f_namemax = 0
 
         FuseStruct.__init__(self, **kw)
@@ -430,10 +440,10 @@ class Direntry(FuseStruct):
 
     def __init__(self, name, **kw):
 
-        self.name = name
+        self.name   = name
         self.offset = 0
-        self.type = 0
-        self.ino = 0
+        self.type   = 0
+        self.ino    = 0
 
         FuseStruct.__init__(self, **kw)
 
@@ -446,9 +456,16 @@ class Flock(FuseStruct):
     `l_len`, `l_pid` attributes (`l_whence` is not used by
     FUSE, see ``fuse.h``).
     """
+
+    def __init__(self, name, **kw):
+    
+        self.l_type  = None
+        self.l_start = None
+        self.l_len   = None
+        self.l_pid   = None
  
-    pass
- 
+        FuseStruct.__init__(self, **kw)
+
  
 class Timespec(FuseStruct):
     """
@@ -456,14 +473,19 @@ class Timespec(FuseStruct):
     http://www.opengroup.org/onlinepubs/009695399/basedefs/time.h.html
     """
 
-    pass
+    def __init__(self, name, **kw):
+    
+        self.tv_sec  = None
+        self.tv_nsec = None
+ 
+        FuseStruct.__init__(self, **kw)
 
 
 class FuseFileInfo(FuseStruct):
 
     def __init__(self, **kw):
 
-        self.keep = False
+        self.keep      = False
         self.direct_io = False
 
         FuseStruct.__init__(self, **kw)
