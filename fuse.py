@@ -390,6 +390,8 @@ class Stat(FuseStruct):
         self.st_mtime = None
         self.st_ctime = None
 
+        FuseStruct.__init__(self, **kw)
+
 
 class StatVfs(FuseStruct):
     """
