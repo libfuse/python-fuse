@@ -75,6 +75,8 @@ fuse_python_api = __getenv__('FUSE_PYTHON_API', '^[\d.]+$',
 # deprecated way of API specification
 compat_0_1 = __getenv__('FUSE_PYTHON_COMPAT', '^(0.1|ALL)$', lambda x: True)
 
+fuse_python_api = get_fuse_python_api()
+
 ##########
 ###
 ###  Parsing for FUSE.
@@ -653,11 +655,11 @@ class Fuse(object):
         unchanged.
 
         The parser class is `FuseOptParse` unless you specify one using the
-        ``parser_class`` keyword. (See `FuseOptPatse documentation for
+        ``parser_class`` keyword. (See `FuseOptParse` documentation for
         available options.)
         """
 
-        if not fuse_python_api and not compat_0_1:
+        if not fuse_python_api:
             raise RuntimeError, __name__ + """.fuse_python_api not defined.
 
 ! Please define """ + __name__ + """.fuse_python_api internally (eg.
@@ -673,6 +675,21 @@ class Fuse(object):
 ! If you are actually developing a filesystem, probably (1) is the way to go.
 ! If you are using a filesystem written before 2007 Q2, probably (2) is what
 ! you want."
+"""
+
+        def malformed():
+            raise RuntimeError, \
+                  "malformatted fuse_python_api value " + `fuse_python_api`
+        if not isinstance(fuse_python_api, tuple):
+            malformed()
+        for i in fuse_python_api:
+            if not isinstance(i, int) or i < 0:
+                malformed() 
+
+        if fuse_python_api > FUSE_PYTHON_API_VERSION:
+            raise RuntimeError, """
+! You require FUSE-Python API version """ + `fuse_python_api` + """.
+! However, the latest available is """ + `FUSE_PYTHON_API_VERSION` + """.
 """
 
         self.fuse_args = \
