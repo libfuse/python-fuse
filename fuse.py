@@ -382,15 +382,15 @@ class Stat(FuseStruct):
 
     def __init__(self, **kw):
         self.st_mode  = None
-        self.st_ino   = None
-        self.st_dev   = None
+        self.st_ino   = 0
+        self.st_dev   = 0
         self.st_nlink = None
-        self.st_uid   = None
-        self.st_gid   = None
-        self.st_size  = None
-        self.st_atime = None
-        self.st_mtime = None
-        self.st_ctime = None
+        self.st_uid   = 0
+        self.st_gid   = 0
+        self.st_size  = 0
+        self.st_atime = 0
+        self.st_mtime = 0
+        self.st_ctime = 0
 
         FuseStruct.__init__(self, **kw)
 
