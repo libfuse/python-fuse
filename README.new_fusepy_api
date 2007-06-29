@@ -5,7 +5,6 @@ FUSE-Python_ bindings new API
 .. _FUSE-Python: http://fuse.sourceforge.net/wiki/index.php/FusePython
 
 :Author: Csaba Henk
-:copyright: This document has been placed in the public domain.
 
 I've made several changes on the FUSE Python interface as we knew it.
 We will review here how this effects the usage of the module -- both
@@ -325,8 +324,9 @@ safely passed down to FUSE.
 Long-term compatibility
 -----------------------
 
-You are suggested to declare explicitly the API you use by setting
-``fuse.fuse_python_api`` to the value of ``fuse.FUSE_PYTHON_API_VERSION`` as
-it's definied in the fuse.py instance you code your filesystem against. This
-ensures that your code will keep working even if further API revisions take
-place.
+Your filesystem is expected to set ``fuse.fuse_python_api`` in order to
+make it easy for the fuse module to find out the which FUSE-Python API revision
+is appropriate for your code. Concretely, set ``fuse.fuse_python_api``
+to the value of ``fuse.FUSE_PYTHON_API_VERSION`` as it's definied in the fuse.pyi
+instance you code your filesystem against. This ensures that your code will
+keep working even if further API revisions take place.
