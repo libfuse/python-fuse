@@ -781,9 +781,7 @@ fsdestroy_func(void *param)
 {
 	(void)param;
 
-	PYLOCK();
 	PyObject_CallFunction(fsdestroy_cb, "");
-	PYUNLOCK();
 }
 #endif
 
