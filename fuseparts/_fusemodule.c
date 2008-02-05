@@ -781,7 +781,9 @@ fsdestroy_func(void *param)
 {
 	(void)param;
 
+	PYLOCK();
 	PyObject_CallFunction(fsdestroy_cb, "");
+	PYUNLOCK();
 }
 #endif
 
@@ -889,6 +891,7 @@ pyfuse_loop_mt(struct fuse *f)
 	save = PyEval_SaveThread();
 	err = fuse_loop_mt(f);
 	PyEval_RestoreThread(save);
+	interp = NULL;
 #endif
 
 	return(err);
