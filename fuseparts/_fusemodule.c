@@ -118,7 +118,7 @@ fi_to_py(struct fuse_file_info *fi)
 
 /* transform a Python integer to an unsigned C numeric value */
 
-#define py2attr(st, attr)						\
+#define py2attr(st, attr) {						\
 	if (PyInt_Check(pytmp) && sizeof((st)->attr) <= sizeof(long)) {	\
 		/*							\
 		 * We'd rather use here PyInt_AsUnsignedLong() here	\
@@ -162,8 +162,9 @@ fi_to_py(struct fuse_file_info *fi)
 		goto OUT_DECREF;					\
 	(st)->attr = ctmp;						\
 	if ((unsigned long long)(st)->attr != ctmp)			\
-		goto OUT_DECREF;
-		
+		goto OUT_DECREF;					\
+}
+
 #define fetchattr_nam(st, attr, aname)					\
 	if (!(pytmp = PyObject_GetAttrString(v, aname)))		\
 		goto OUT_DECREF;					\
@@ -174,7 +175,13 @@ fi_to_py(struct fuse_file_info *fi)
 
 #define fetchattr_soft(st, attr)					\
 	if (PyObject_HasAttrString(v, #attr)) {				\
-		fetchattr(st, attr);					\
+		pytmp = PyObject_GetAttrString(v, #attr);		\
+		if (!pytmp)						\
+			goto OUT_DECREF;				\
+	        if (pytmp == Py_None)					\
+			Py_DECREF(pytmp);				\
+		else							\
+			py2attr(st, attr);				\
 	}
 
 /*
