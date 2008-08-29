@@ -19,6 +19,7 @@ except:
 
 from string import join
 import sys
+import os
 from errno import *
 from os import environ
 import re
@@ -326,7 +327,7 @@ class FuseOptParse(SubbedOptParse):
     def parse_args(self, args=None, values=None):
         o, a = SubbedOptParse.parse_args(self, args, values)
         if a and self.fetch_mp:
-            self.fuse_args.mountpoint = a.pop()
+            self.fuse_args.mountpoint = os.path.realpath(a.pop())
         return o, a
 
     def add_option(self, *opts, **attrs):
