@@ -678,8 +678,22 @@ getxattr_func(const char *path, const char *name, char *value, size_t size)
 #endif
 
 	if(PyString_Check(v)) {
-		if(PyString_Size(v) > size)
+        /* size zero can be passed into these calls  to return the current size of
+         * the named extended attribute
+         */
+        if (size == 0) {
+		    ret = PyString_Size(v);
 			goto OUT_DECREF;
+        } 
+
+        /* If the size of the value buffer is too small to hold the result,  errno
+         * is set to ERANGE.
+         */
+		if (PyString_Size(v) > size) {
+            ret = -ERANGE;
+			goto OUT_DECREF;
+        }
+
 		memcpy(value, PyString_AsString(v), PyString_Size(v));
 		ret = PyString_Size(v);
 	}
