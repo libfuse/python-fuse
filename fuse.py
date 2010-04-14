@@ -462,13 +462,14 @@ class Flock(FuseStruct):
     FUSE, see ``fuse.h``).
     """
 
-    def __init__(self, **kw):
+    def __init__(self, name=None, **kw):
     
         self.l_type  = None
         self.l_start = None
         self.l_len   = None
         self.l_pid   = None
  
+        kw['name'] = name
         FuseStruct.__init__(self, **kw)
 
  
@@ -478,11 +479,12 @@ class Timespec(FuseStruct):
     http://www.opengroup.org/onlinepubs/009695399/basedefs/time.h.html
     """
 
-    def __init__(self, **kw):
+    def __init__(self, name=None, **kw):
     
         self.tv_sec  = None
         self.tv_nsec = None
  
+        kw['name'] = name
         FuseStruct.__init__(self, **kw)
 
 
