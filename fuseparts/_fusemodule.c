@@ -281,7 +281,8 @@ opendir_func(const char *path, struct fuse_file_info *fi)
 
 	fi->fh = (uintptr_t) v;
 
-	return 0;
+	ret = 0;
+	goto OUT;
 
 	EPILOGUE
 }
