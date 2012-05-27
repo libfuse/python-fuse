@@ -529,11 +529,15 @@ open_func(const char *path, struct fuse_file_info *fi)
 	if (pytmp1) {
 		fi->keep_cache = PyObject_IsTrue(pytmp1);
 		Py_DECREF(pytmp1);
+	} else {
+		PyErr_Clear();
 	}
 	pytmp1 = PyObject_GetAttrString(pytmp, "direct_io");
 	if (pytmp1) {
 		fi->direct_io = PyObject_IsTrue(pytmp1);
 		Py_DECREF(pytmp1);
+	} else {
+		PyErr_Clear();
 	}
 
 	if (PyObject_IsTrue(PyTuple_GetItem(v, 1)))
@@ -573,11 +577,15 @@ create_func(const char *path, mode_t mode, struct fuse_file_info *fi)
 	if (pytmp1) {
 		fi->keep_cache = PyObject_IsTrue(pytmp1);
 		Py_DECREF(pytmp1);
+	} else {
+		PyErr_Clear();
 	}
 	pytmp1 = PyObject_GetAttrString(pytmp, "direct_io");
 	if (pytmp1) {
 		fi->direct_io = PyObject_IsTrue(pytmp1);
 		Py_DECREF(pytmp1);
+	} else {
+		PyErr_Clear();
 	}
 
 	if (PyObject_IsTrue(PyTuple_GetItem(v, 1))) {
