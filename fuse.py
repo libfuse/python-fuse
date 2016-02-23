@@ -647,7 +647,7 @@ class Fuse(object):
               'statfs', 'fsync', 'create', 'opendir', 'releasedir', 'fsyncdir',
               'flush', 'fgetattr', 'ftruncate', 'getxattr', 'listxattr',
               'setxattr', 'removexattr', 'access', 'lock', 'utimens', 'bmap',
-              'fsinit', 'fsdestroy']
+              'fsinit', 'fsdestroy', 'ioctl']
 
     fusage = "%prog [mountpoint] [options]"
 
