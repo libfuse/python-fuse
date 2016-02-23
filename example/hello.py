@@ -61,8 +61,8 @@ class HelloFS(Fuse):
         if path != hello_path:
             return -errno.ENOENT
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
-	#if (flags & accmode) != os.O_RDONLY:
-        #    return -errno.EACCES
+        if (flags & accmode) != os.O_RDONLY:
+            return -errno.EACCES
 
     def read(self, path, size, offset):
         if path != hello_path:
@@ -75,18 +75,6 @@ class HelloFS(Fuse):
         else:
             buf = ''
         return buf
-
-    def ioctl(self, path, cmd, arg, flags):
-        l = -1
-        if arg is not None:
-            l = len(arg)
-        print "ioctl with path >%s< cmd: %d arglen %d, flags %x" % (path, cmd, l,flags)
-
-        if cmd == -2146941696: # get
-            return self.the_buffer_size;
-        elif cmd == 1074283777: # set
-            self.the_buffer_size = arg;
-        return 0
 
 def main():
     usage="""
