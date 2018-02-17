@@ -36,8 +36,8 @@ class MyDistribution(Distribution):
         if command == 'sdist':
             for f in ('Changelog', 'README.new_fusepy_api.html'):
                  if not os.path.exists(f):
-                     raise RuntimeError, 'file ' + `f` + \
-                           " doesn't exist, please generate it before creating a source distribution"
+                     raise RuntimeError('file ' + repr(f) + \
+                           " doesn't exist, please generate it before creating a source distribution")
 
         return Distribution.run_command(self, command)
 
@@ -57,12 +57,12 @@ if os.system('pkg-config --exists fuse 2> /dev/null') == 0:
 
 else:
     if os.system('pkg-config --usage 2> /dev/null') == 0:
-        print """pkg-config could not find fuse:
+        print("""pkg-config could not find fuse:
 you might need to adjust PKG_CONFIG_PATH or your 
-FUSE installation is very old (older than 2.1-pre1)"""
+FUSE installation is very old (older than 2.1-pre1)""")
 
     else:
-        print "pkg-config unavailable, build terminated"
+        print("pkg-config unavailable, build terminated")
         sys.exit(1)
 
 # there must be an easier way to set up these flags!
@@ -72,7 +72,7 @@ libdirs = [x[2:] for x in libs.split() if x[0:2] == '-L']
 libsonly = [x[2:] for x in libs.split() if x[0:2] == '-l']
 
 try:
-    import thread
+    import _thread
 except ImportError:
     # if our Python doesn't have thread support, we enforce
     # linking against libpthread so that libfuse's pthread
@@ -93,13 +93,13 @@ fusemodule = Extension('fuseparts._fusemodule', sources = ['fuseparts/_fusemodul
 if sys.version_info < (2, 3):
     _setup = setup
     def setup(**kwargs):
-        if kwargs.has_key("classifiers"):
+        if "classifiers" in kwargs:
             del kwargs["classifiers"]
         _setup(**kwargs)
 setup (name = 'fuse-python',
        version = __version__,
        description = 'Bindings for FUSE',
-       classifiers = filter(None, classifiers.split("\n")),
+       classifiers = [_f for _f in classifiers.split("\n") if _f],
        license = 'LGPL',
        platforms = ['posix'],
        url = 'http://fuse.sourceforge.net/wiki/index.php/FusePython',

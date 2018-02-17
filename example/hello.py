@@ -17,8 +17,7 @@ from fuse import Fuse
 
 
 if not hasattr(fuse, '__version__'):
-    raise RuntimeError, \
-        "your fuse-py doesn't know of fuse.__version__, probably it's too old."
+    raise RuntimeError("your fuse-py doesn't know of fuse.__version__, probably it's too old.")
 
 fuse.fuse_python_api = (0, 2)
 
@@ -43,10 +42,10 @@ class HelloFS(Fuse):
     def getattr(self, path):
         st = MyStat()
         if path == '/':
-            st.st_mode = stat.S_IFDIR | 0755
+            st.st_mode = stat.S_IFDIR | 0o755
             st.st_nlink = 2
         elif path == hello_path:
-            st.st_mode = stat.S_IFREG | 0444
+            st.st_mode = stat.S_IFREG | 0o444
             st.st_nlink = 1
             st.st_size = len(hello_str)
         else:

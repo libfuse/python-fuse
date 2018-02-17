@@ -11,7 +11,7 @@ for d in [ddd, '.']:
 try:
     import fuse
 except ImportError:
-    raise RuntimeError, """
+    raise RuntimeError("""
 
 ! Got exception:
 """ + "".join([ "> " + x for x in format_exception(*sys.exc_info()) ]) + """
@@ -19,4 +19,4 @@ except ImportError:
 !
 ! We've done our best to find the necessary components of the FUSE bindings
 ! even if it's not installed, we've got no clue what went wrong for you...
-"""
+""")
