@@ -17,7 +17,6 @@ try:
 except:
     pass
 
-from string import join
 import sys
 import os
 from errno import *
@@ -317,7 +316,6 @@ class FuseOptParse(SubbedOptParse):
 
     def print_help(self, file=sys.stderr):
         SubbedOptParse.print_help(self, file)
-        print(file=file)
         self.fuse_args.setmod('showhelp')
 
     def print_version(self, file=sys.stderr):
