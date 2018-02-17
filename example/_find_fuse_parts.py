@@ -2,10 +2,12 @@ import sys, os, glob
 from os.path import realpath, dirname, join
 from traceback import format_exception
 
+PYTHON_MAJOR_MINOR = "%s.%s" % (sys.version_info[0], sys.version_info[1])
+
 ddd = realpath(join(dirname(sys.argv[0]), '..'))
 
 for d in [ddd, '.']: 
-    for p in glob.glob(join(d, 'build', 'lib.*')):
+    for p in glob.glob(join(d, 'build', 'lib.*%s' % PYTHON_MAJOR_MINOR)):
         sys.path.insert(0, p)
 
 try:

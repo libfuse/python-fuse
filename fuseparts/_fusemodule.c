@@ -35,6 +35,16 @@
 #include <Python.h>
 #include <fuse.h>
 
+#if PY_MAJOR_VERSION >= 3
+    #define PyInt_FromLong PyLong_FromLong
+    #define PyInt_AsLong PyLong_AsLong
+    #define PyInt_Check PyLong_Check
+    #define PyInt_AsUnsignedLongLongMask PyLong_AsUnsignedLongLongMask
+    #define PyString_AsString PyUnicode_AsUTF8
+    #define PyString_Check PyUnicode_Check
+    #define PyString_Size PyUnicode_GET_SIZE
+#endif
+
 static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *mknod_cb=NULL, *mkdir_cb=NULL, *unlink_cb=NULL, *rmdir_cb=NULL,
   *symlink_cb=NULL, *rename_cb=NULL, *link_cb=NULL, *chmod_cb=NULL,
@@ -51,20 +61,31 @@ static PyInterpreterState *interp;
 
 #ifdef WITH_THREAD
 
-#define PYLOCK()						\
-PyThreadState *_state = NULL;					\
-if (interp) {							\
+#if PY_MAJOR_VERSION >= 3
+#define PYLOCK() \
+  PyGILState_STATE gstate; \
+  gstate = PyGILState_Ensure();
+#else
+#define PYLOCK()                                                \
+  PyThreadState *_state = NULL;					\
+  if (interp) {							\
 	PyEval_AcquireLock();					\
 	_state = PyThreadState_New(interp);			\
 	PyThreadState_Swap(_state);				\
-}
+  }
+#endif
 
-#define PYUNLOCK() if (interp) {				\
+#if PY_MAJOR_VERSION >= 3
+#define PYUNLOCK() PyGILState_Release(gstate);
+#else
+#define PYUNLOCK()                                              \
+  if (interp) {                                                 \
 	PyThreadState_Clear(_state);				\
 	PyThreadState_Swap(NULL);				\
 	PyThreadState_Delete(_state);				\
 	PyEval_ReleaseLock();					\
-}
+  }
+#endif
  
 #else
 #define PYLOCK()
@@ -1203,16 +1224,26 @@ static PyMethodDef Fuse_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef fuse_module = {
+	PyModuleDef_HEAD_INIT,
+	"_fuse",     /* m_name */
+	"FUSE module",  /* m_doc */
+	-1,                  /* m_size */
+	Fuse_methods
+};
+#endif
 
-/* Initialization function for the module (*must* be called init_fuse) */
-
-DL_EXPORT(void)
-init_fuse(void)
+PyObject *PyInit__fuse(void)
 {
 	PyObject *m, *d;
  
 	/* Create the module and add the functions */
-	m = Py_InitModule("_fuse", Fuse_methods);
+#if PY_MAJOR_VERSION >= 3
+	m = PyModule_Create(&fuse_module);
+#else
+	m = Py_InitModule3("_fuse", Fuse_methods, "FUSE module");
+#endif
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);
@@ -1220,4 +1251,14 @@ init_fuse(void)
 	PyDict_SetItemString(d, "FuseError", Py_FuseError);
 	/* compat */
 	PyDict_SetItemString(d, "error", Py_FuseError);
+
+	return m;
 }
+
+#if PY_MAJOR_VERSION == 2
+DL_EXPORT(void)
+init_fuse(void)
+{
+     PyInit__fuse();
+}
+#endif
