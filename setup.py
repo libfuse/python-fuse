@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 # distutils build script
 # To install fuse-python, run 'python setup.py install'
 
@@ -17,11 +20,18 @@ import sys
 from fuseparts import __version__ 
 
 classifiers = """\
-Development Status :: 4 - Beta
+Development Status :: 5 - Production/Stable
 Intended Audience :: Developers
 License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
+Environment :: Console,
 Operating System :: POSIX
 Programming Language :: C
+Programming Language :: Python,
+Programming Language :: Python :: 2,
+Programming Language :: Python :: 2.7,
+Programming Language :: Python :: 3,
+Programming Language :: Python :: 3.5,
+Programming Language :: Python :: 3.6,
 Programming Language :: Python
 Topic :: System :: Filesystems
 """
@@ -102,7 +112,10 @@ setup (name = 'fuse-python',
        classifiers = [_f for _f in classifiers.split("\n") if _f],
        license = 'LGPL',
        platforms = ['posix'],
-       url = 'http://fuse.sourceforge.net/wiki/index.php/FusePython',
+       url = 'https://github.com/libfuse/python-fuse',
+       package_data={'': ['COPYING', 'AUTHORS', 'FAQ', 'INSTALL',
+                          'README.md', 'README.new_fusepy_api',
+                          'README.package_maintainers']},
        author = 'Jeff Epler',
        author_email = 'jepler@unpythonic.dhs.org',
        maintainer = 'Csaba Henk',
