@@ -30,7 +30,7 @@ class SubOptsHive(object):
     def _str_core(self):
 
         sa = []
-        for k, v in self.optdict.iteritems():
+        for k, v in self.optdict.items():
              sa.append(str(k) + '=' + str(v))
 
         ra = (list(self.optlist) + sa) or ["(none)"]
@@ -47,7 +47,7 @@ class SubOptsHive(object):
         with True value to optlist, stringify other values.
         """
 
-        for k, v in self.optdict.iteritems():
+        for k, v in self.optdict.items():
             if v == False:
                 self.optdict.pop(k)
             elif v == True:
@@ -84,7 +84,7 @@ class SubOptsHive(object):
 
         if (v):
             if val != None:
-                raise AttributeError, "ambiguous option value"
+                raise AttributeError("ambiguous option value")
             val = v
 
         if val == False:

@@ -21,8 +21,7 @@ from fuse import Fuse
 
 
 if not hasattr(fuse, '__version__'):
-    raise RuntimeError, \
-        "your fuse-py doesn't know of fuse.__version__, probably it's too old."
+    raise RuntimeError("your fuse-py doesn't know of fuse.__version__, probably it's too old.")
 
 fuse.fuse_python_api = (0, 2)
 
@@ -269,7 +268,7 @@ Userspace nullfs-alike: mirror the filesystem tree from some point on.
         if server.fuse_args.mount_expected():
             os.chdir(server.root)
     except OSError:
-        print >> sys.stderr, "can't enter root of underlying filesystem"
+        print("can't enter root of underlying filesystem", file=sys.stderr)
         sys.exit(1)
 
     server.main()

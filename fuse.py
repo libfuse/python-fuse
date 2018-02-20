@@ -17,7 +17,6 @@ try:
 except:
     pass
 
-from string import join
 import sys
 import os
 from errno import *
@@ -56,7 +55,7 @@ def __getenv__(var, pattern = '.', trans = lambda x: x):
         rpat = re.compile(rpat)
     if not rpat.search(val):
         raise RuntimeError("env var %s doesn't match required pattern %s" % \
-                           (var, `pattern`))
+                           (var, repr(pattern)))
     return trans(val)
 
 def get_fuse_python_api():
@@ -134,12 +133,12 @@ class FuseArgs(SubOptsHive):
         args = [sys.argv and sys.argv[0] or "python"]
         if self.mountpoint:
             args.append(self.mountpoint)
-        for m, v in self.modifiers.iteritems():
+        for m, v in self.modifiers.items():
             if v:
                 args.append(self.fuse_modifiers[m])
 
         opta = []
-        for o, v in self.optdict.iteritems():
+        for o, v in self.optdict.items():
                 opta.append(o + '=' + v)
         opta.extend(self.optlist)
 
@@ -283,7 +282,7 @@ class FuseOptParse(SubbedOptParse):
 
         if dsd == 'whine':
             def dsdcb(option, opt_str, value, parser):
-                raise RuntimeError, """
+                raise RuntimeError("""
 
 ! If you want the "-s" option to work, pass
 !
@@ -291,7 +290,7 @@ class FuseOptParse(SubbedOptParse):
 !
 ! to the Fuse constructor. See docstring of the FuseOptParse class for an
 ! explanation why is it not set by default.
-"""
+""")
 
         elif dsd == 'setsingle':
             def dsdcb(option, opt_str, value, parser):
@@ -300,7 +299,7 @@ class FuseOptParse(SubbedOptParse):
         elif dsd == 'undef':
             dsdcb = None
         else:
-            raise ArgumentError, "key `dash_s_do': uninterpreted value " + str(dsd)
+            raise ArgumentError("key `dash_s_do': uninterpreted value " + str(dsd))
 
         if dsdcb:
             self.add_option('-s', action='callback', callback=dsdcb,
@@ -313,11 +312,10 @@ class FuseOptParse(SubbedOptParse):
 
     def error(self, msg):
         SubbedOptParse.error(self, msg)
-        raise OptParseError, msg
+        raise OptParseError(msg)
 
     def print_help(self, file=sys.stderr):
         SubbedOptParse.print_help(self, file)
-        print >> file
         self.fuse_args.setmod('showhelp')
 
     def print_version(self, file=sys.stderr):
@@ -359,8 +357,8 @@ class ErrnoWrapper(object):
 
     def __call__(self, *args, **kw):
         try:
-            return apply(self.func, args, kw)
-        except (IOError, OSError), detail:
+            return self.func(*args, **kw)
+        except (IOError, OSError) as detail:
             # Sometimes this is an int, sometimes an instance...
             if hasattr(detail, "errno"): detail = detail.errno
             return -detail
@@ -578,7 +576,7 @@ def feature_needs(*feas):
                     mag = ma.groups()
                     fp = re.compile(mag[1])
                     neg = bool(mag[0])
-                for f in fmap.keys() + [ 'has_' + a for a in Fuse._attrs ]:
+                for f in list(fmap.keys()) + [ 'has_' + a for a in Fuse._attrs ]:
                     if neg != bool(re.search(fp, f)):
                         yield f
                 continue
@@ -663,11 +661,11 @@ class Fuse(object):
         """
 
         if not fuse_python_api:
-            raise RuntimeError, __name__ + """.fuse_python_api not defined.
+            raise RuntimeError(__name__ + """.fuse_python_api not defined.
 
 ! Please define """ + __name__ + """.fuse_python_api internally (eg.
 ! 
-! (1)  """ + __name__ + """.fuse_python_api = """ + `FUSE_PYTHON_API_VERSION` + """
+! (1)  """ + __name__ + """.fuse_python_api = """ + repr(FUSE_PYTHON_API_VERSION) + """
 ! 
 ! ) or in the enviroment (eg. 
 ! 
@@ -678,11 +676,10 @@ class Fuse(object):
 ! If you are actually developing a filesystem, probably (1) is the way to go.
 ! If you are using a filesystem written before 2007 Q2, probably (2) is what
 ! you want."
-"""
+""")
 
         def malformed():
-            raise RuntimeError, \
-                  "malformatted fuse_python_api value " + `fuse_python_api`
+            raise RuntimeError("malformatted fuse_python_api value " + repr(fuse_python_api))
         if not isinstance(fuse_python_api, tuple):
             malformed()
         for i in fuse_python_api:
@@ -690,10 +687,10 @@ class Fuse(object):
                 malformed() 
 
         if fuse_python_api > FUSE_PYTHON_API_VERSION:
-            raise RuntimeError, """
-! You require FUSE-Python API version """ + `fuse_python_api` + """.
-! However, the latest available is """ + `FUSE_PYTHON_API_VERSION` + """.
-"""
+            raise RuntimeError("""
+! You require FUSE-Python API version """ + repr(fuse_python_api) + """.
+! However, the latest available is """ + repr(FUSE_PYTHON_API_VERSION) + """.
+""")
 
         self.fuse_args = \
             'fuse_args' in kw and kw.pop('fuse_args') or FuseArgs()
@@ -719,7 +716,7 @@ class Fuse(object):
 
         ev = 'errex' in kw and kw.pop('errex')
         if ev and not isinstance(ev, int):
-            raise TypeError, "error exit value should be an integer"
+            raise TypeError("error exit value should be an integer")
 
         try:
             self.cmdline = self.parser.parse_args(*args, **kw)
@@ -893,7 +890,7 @@ class Fuse(object):
         if m:
             return m
 
-        raise AttributeError, "Fuse instance has no attribute '%s'" % meth
+        raise AttributeError("Fuse instance has no attribute '%s'" % meth)
 
 
 
