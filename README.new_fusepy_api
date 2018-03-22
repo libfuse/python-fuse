@@ -2,7 +2,7 @@
 FUSE-Python_ bindings new API
 =============================
 
-.. _FUSE-Python: http://fuse.sourceforge.net/wiki/index.php/FusePython
+.. _FUSE-Python: https://github.com/libfuse/python-fuse
 
 :Author: Csaba Henk
 
