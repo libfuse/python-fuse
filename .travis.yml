@@ -1,0 +1,6 @@
+language: python
+
+addons:
+  apt:
+    packages:
+    - libfuse-dev
