@@ -5,5 +5,5 @@ addons:
     packages:
     - libfuse-dev
 
-script:
+install:
   - python setup.py build
