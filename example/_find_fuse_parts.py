@@ -10,6 +10,8 @@ for d in [ddd, '.']:
     for p in glob.glob(join(d, 'build', 'lib.*%s' % PYTHON_MAJOR_MINOR)):
         sys.path.insert(0, p)
 
+print(sys.path)
+
 try:
     import fuse
 except ImportError:
