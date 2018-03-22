@@ -4,3 +4,6 @@ addons:
   apt:
     packages:
     - libfuse-dev
+
+script:
+  - python setup.py build
