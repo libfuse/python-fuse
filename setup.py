@@ -93,7 +93,7 @@ except ImportError:
 # libraries=[]
 # runtime_library_dirs=[]
 # extra_objects, extra_compile_args, extra_link_args
-fusemodule = Extension('fuseparts._fusemodule', sources = ['fuseparts/_fusemodule.c'],
+fusemodule = Extension('fuseparts._fuse', sources = ['fuseparts/_fusemodule.c'],
                   include_dirs = iflags,
                   extra_compile_args = extra_cflags,
                   library_dirs = libdirs,
