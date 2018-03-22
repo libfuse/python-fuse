@@ -14,5 +14,6 @@ install:
   - python setup.py build
 
 script:
+  - sudo modprobe fuse
   - mkdir /tmp/foo
   - python example/hello.py /tmp/foo
