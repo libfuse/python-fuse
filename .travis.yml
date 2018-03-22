@@ -12,3 +12,7 @@ addons:
 
 install:
   - python setup.py build
+
+script:
+  - mkdir /tmp/foo
+  - python example/hello.py /tmp/foo
