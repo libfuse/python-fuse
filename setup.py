@@ -66,7 +66,7 @@ if os.system('pkg-config --exists fuse 2> /dev/null') == 0:
     pkgcfg.close()
 
 else:
-    if os.system('pkg-config --usage 2> /dev/null') == 0:
+    if os.system('pkg-config --help 2> /dev/null') == 0:
         print("""pkg-config could not find fuse:
 you might need to adjust PKG_CONFIG_PATH or your 
 FUSE installation is very old (older than 2.1-pre1)""")
