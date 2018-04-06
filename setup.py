@@ -19,22 +19,19 @@ import sys
 
 from fuseparts import __version__ 
 
-classifiers = """\
-Development Status :: 5 - Production/Stable
-Intended Audience :: Developers
-License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
-Environment :: Console,
-Operating System :: POSIX
-Programming Language :: C
-Programming Language :: Python,
-Programming Language :: Python :: 2,
-Programming Language :: Python :: 2.7,
-Programming Language :: Python :: 3,
-Programming Language :: Python :: 3.5,
-Programming Language :: Python :: 3.6,
-Programming Language :: Python
-Topic :: System :: Filesystems
-"""
+classifiers = [ "Development Status :: 5 - Production/Stable",
+                "Intended Audience :: Developers",
+                "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
+                "Environment :: Console",
+                "Operating System :: POSIX",
+                "Programming Language :: C",
+                "Programming Language :: Python",
+                "Programming Language :: Python :: 2",
+                "Programming Language :: Python :: 2.7",
+                "Programming Language :: Python :: 3",
+                "Programming Language :: Python :: 3.5",
+                "Programming Language :: Python :: 3.6",
+                "Topic :: System :: Filesystems" ]
 
 class MyDistribution(Distribution):
     """
@@ -109,7 +106,7 @@ if sys.version_info < (2, 3):
 setup (name = 'fuse-python',
        version = __version__,
        description = 'Bindings for FUSE',
-       classifiers = [_f for _f in classifiers.split("\n") if _f],
+       classifiers = classifiers,
        license = 'LGPL',
        platforms = ['posix'],
        url = 'https://github.com/libfuse/python-fuse',
