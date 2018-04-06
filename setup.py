@@ -106,6 +106,8 @@ if sys.version_info < (2, 3):
 setup (name = 'fuse-python',
        version = __version__,
        description = 'Bindings for FUSE',
+       long_description = """This is a Python interface to libfuse (https://github.com/libfuse/libfuse),
+a simple interface for userspace programs to export a virtual filesystem to the Linux kernel""",
        classifiers = classifiers,
        license = 'LGPL',
        platforms = ['posix'],
