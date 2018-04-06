@@ -1,5 +1,7 @@
 # python-fuse #
 
+[![Build Status](https://travis-ci.org/libfuse/python-fuse.svg?branch=master)](https://travis-ci.org/libfuse/python-fuse)
+
 This is a Python interface to libfuse
 (https://github.com/libfuse/libfuse).
 
