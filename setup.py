@@ -42,14 +42,14 @@ class MyDistribution(Distribution):
     the to-be-generated files
     """
 
-    def run_command(self, command):
-        if command == 'sdist':
-            for f in ('Changelog', 'README.new_fusepy_api.html'):
-                 if not os.path.exists(f):
-                     raise RuntimeError('file ' + repr(f) + \
-                           " doesn't exist, please generate it before creating a source distribution")
+#     def run_command(self, command):
+#         if command == 'sdist':
+#             for f in ('Changelog', 'README.new_fusepy_api.html'):
+#                  if not os.path.exists(f):
+#                      raise RuntimeError('file ' + repr(f) + \
+#                            " doesn't exist, please generate it before creating a source distribution")
 
-        return Distribution.run_command(self, command)
+#         return Distribution.run_command(self, command)
 
 
 # write default fuse.pc path into environment if PKG_CONFIG_PATH is unset
