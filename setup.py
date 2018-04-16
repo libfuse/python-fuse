@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 # distutils build script
 # To install fuse-python, run 'python setup.py install'
 
@@ -16,15 +19,19 @@ import sys
 
 from fuseparts import __version__ 
 
-classifiers = """\
-Development Status :: 4 - Beta
-Intended Audience :: Developers
-License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
-Operating System :: POSIX
-Programming Language :: C
-Programming Language :: Python
-Topic :: System :: Filesystems
-"""
+classifiers = [ "Development Status :: 5 - Production/Stable",
+                "Intended Audience :: Developers",
+                "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
+                "Environment :: Console",
+                "Operating System :: POSIX",
+                "Programming Language :: C",
+                "Programming Language :: Python",
+                "Programming Language :: Python :: 2",
+                "Programming Language :: Python :: 2.7",
+                "Programming Language :: Python :: 3",
+                "Programming Language :: Python :: 3.5",
+                "Programming Language :: Python :: 3.6",
+                "Topic :: System :: Filesystems" ]
 
 class MyDistribution(Distribution):
     """
@@ -32,14 +39,14 @@ class MyDistribution(Distribution):
     the to-be-generated files
     """
 
-    def run_command(self, command):
-        if command == 'sdist':
-            for f in ('Changelog', 'README.new_fusepy_api.html'):
-                 if not os.path.exists(f):
-                     raise RuntimeError, 'file ' + `f` + \
-                           " doesn't exist, please generate it before creating a source distribution"
+#     def run_command(self, command):
+#         if command == 'sdist':
+#             for f in ('Changelog', 'README.new_fusepy_api.html'):
+#                  if not os.path.exists(f):
+#                      raise RuntimeError('file ' + repr(f) + \
+#                            " doesn't exist, please generate it before creating a source distribution")
 
-        return Distribution.run_command(self, command)
+#         return Distribution.run_command(self, command)
 
 
 # write default fuse.pc path into environment if PKG_CONFIG_PATH is unset
@@ -56,13 +63,13 @@ if os.system('pkg-config --exists fuse 2> /dev/null') == 0:
     pkgcfg.close()
 
 else:
-    if os.system('pkg-config --usage 2> /dev/null') == 0:
-        print """pkg-config could not find fuse:
+    if os.system('pkg-config --help 2> /dev/null') == 0:
+        print("""pkg-config could not find fuse:
 you might need to adjust PKG_CONFIG_PATH or your 
-FUSE installation is very old (older than 2.1-pre1)"""
+FUSE installation is very old (older than 2.1-pre1)""")
 
     else:
-        print "pkg-config unavailable, build terminated"
+        print("pkg-config unavailable, build terminated")
         sys.exit(1)
 
 # there must be an easier way to set up these flags!
@@ -72,7 +79,7 @@ libdirs = [x[2:] for x in libs.split() if x[0:2] == '-L']
 libsonly = [x[2:] for x in libs.split() if x[0:2] == '-l']
 
 try:
-    import thread
+    import _thread
 except ImportError:
     # if our Python doesn't have thread support, we enforce
     # linking against libpthread so that libfuse's pthread
@@ -83,7 +90,7 @@ except ImportError:
 # libraries=[]
 # runtime_library_dirs=[]
 # extra_objects, extra_compile_args, extra_link_args
-fusemodule = Extension('fuseparts._fusemodule', sources = ['fuseparts/_fusemodule.c'],
+fusemodule = Extension('fuseparts._fuse', sources = ['fuseparts/_fusemodule.c'],
                   include_dirs = iflags,
                   extra_compile_args = extra_cflags,
                   library_dirs = libdirs,
@@ -93,20 +100,24 @@ fusemodule = Extension('fuseparts._fusemodule', sources = ['fuseparts/_fusemodul
 if sys.version_info < (2, 3):
     _setup = setup
     def setup(**kwargs):
-        if kwargs.has_key("classifiers"):
+        if "classifiers" in kwargs:
             del kwargs["classifiers"]
         _setup(**kwargs)
 setup (name = 'fuse-python',
        version = __version__,
        description = 'Bindings for FUSE',
-       classifiers = filter(None, classifiers.split("\n")),
+       long_description = """This is a Python interface to libfuse (https://github.com/libfuse/libfuse),
+a simple interface for userspace programs to export a virtual filesystem to the Linux kernel""",
+       classifiers = classifiers,
        license = 'LGPL',
        platforms = ['posix'],
-       url = 'http://fuse.sourceforge.net/wiki/index.php/FusePython',
-       author = 'Jeff Epler',
-       author_email = 'jepler@unpythonic.dhs.org',
-       maintainer = 'Csaba Henk',
-       maintainer_email = 'csaba.henk@creo.hu',
+       url = 'https://github.com/libfuse/python-fuse',
+       package_data={'': ['COPYING', 'AUTHORS', 'FAQ', 'INSTALL',
+                          'README.md', 'README.new_fusepy_api',
+                          'README.package_maintainers']},
+       author = 'Jeff Epler <jepler@unpythonic.dhs.org>, Csaba Henk <csaba.henk@creo.hu>, Steven James, Miklos Szeredi <miklos@szeredi.hu>, Sébastien Delafond<sdelafond@gmail.com>',
+       maintainer = 'Sébastien Delafond',
+       maintainer_email = 'sdelafond@gmail.com',
        ext_modules = [fusemodule],
        packages = ["fuseparts"],
        py_modules=["fuse"],

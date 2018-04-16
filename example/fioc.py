@@ -16,8 +16,7 @@ from fuse import Fuse
 
 
 if not hasattr(fuse, '__version__'):
-    raise RuntimeError, \
-        "your fuse-py doesn't know of fuse.__version__, probably it's too old."
+    raise RuntimeError("your fuse-py doesn't know of fuse.__version__, probably it's too old.")
 
 fuse.fuse_python_api = (0, 2)
 
@@ -43,32 +42,32 @@ class IOCTL:
 	_IOC_WRITE = 1
 	_IOC_READ = 2
 
-        @classmethod
+	@classmethod
 	def _IOC(cls, d,t,nr,size):
-		return (((d)  << cls._IOC_DIRSHIFT) | 
+		return (((d)  << cls._IOC_DIRSHIFT) |
 			 ((t) << cls._IOC_TYPESHIFT) | \
 			 ((nr)   << cls._IOC_NRSHIFT) | \
 			 ((size) << cls._IOC_SIZESHIFT))
 
-        @classmethod
+	@classmethod
 	def _IO(cls, t,nr):
 		return cls._IOC(cls._IOC_NONE, t, nr, 0)
 
-        @classmethod
+	@classmethod
 	def _IOR(cls, t,nr,size):
 		return cls._IOC(cls._IOC_READ, t, nr, size)
 
-        @classmethod
+	@classmethod
 	def _IOW(cls, t,nr,size):
 		return cls._IOC(cls._IOC_WRITE, t, nr, size)
 
-        @classmethod
+	@classmethod
 	def _IOWR(cls,t,nr,size):
 		return cls._IOC(cls._IOC_WRITE|cls._IOC_READ, t, nr, size)
 
 
 # IOCTL (as defined in fioc.h)
-# Note: on my system, size_t is an unsigned long 
+# Note: on my system, size_t is an unsigned long
 FIOC_GET_SIZE = IOCTL._IOR(ord('E'),0, struct.calcsize("L"));
 FIOC_SET_SIZE = IOCTL._IOW(ord('E'),1, struct.calcsize("L"));
 
@@ -107,7 +106,7 @@ class FiocFS(Fuse):
         if new_size < old_size:
             self.buf = self.buf[0:new_size]
         else:
-            self.buf = self.buf + str(bytearray(new_size - old_size))
+            self.buf = self.buf + "\x00" * (new_size - old_size)
 
         return 0
 
@@ -125,10 +124,10 @@ class FiocFS(Fuse):
         st = MyStat()
         ft = self.file_type(path)
         if ft == FIOC_ROOT:
-            st.st_mode = stat.S_IFDIR | 0755
+            st.st_mode = stat.S_IFDIR | 0o755
             st.st_nlink = 2
         elif ft == FIOC_FILE:
-            st.st_mode = stat.S_IFREG | 0444
+            st.st_mode = stat.S_IFREG | 0o444
             st.st_nlink = 1
             st.st_size = len(self.buf)
         else:
@@ -158,13 +157,12 @@ class FiocFS(Fuse):
         return self.do_read(path, size, offset)
 
     def do_write(self, path, buf, size, offset):
-        
         self.buf = self.buf[0:offset-1] + buf + self.buf[offset+size+1:len(self.buf)]
 
     def write(self, path, buf, size, offset):
         if self.file_type(path) != FIOC_FILE:
             return -errno.EINVAL;
-        
+
         self.do_write(path, buf, size, offset)
 
     def trunate(self, path, size):
@@ -179,10 +177,10 @@ class FiocFS(Fuse):
 
     def ioctl(self, path, cmd, arg, flags):
         if cmd == FIOC_GET_SIZE:
-             data = struct.pack("L",len(self.buf))
-             return data
+            data = struct.pack("L",len(self.buf))
+            return data
         elif cmd == FIOC_SET_SIZE:
-            (l,) = struct.unpack("L",arg);    
+            (l,) = struct.unpack("L",arg);
             self.resize(l)
             return 0
 

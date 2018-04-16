@@ -1,0 +1,19 @@
+language: python
+
+python:
+  - 2.7
+  - 3.5
+  - 3.6
+
+addons:
+  apt:
+    packages:
+    - libfuse-dev
+
+install:
+  - python setup.py build
+
+script:
+  - sudo modprobe fuse
+  - mkdir /tmp/foo
+  - python example/hello.py /tmp/foo

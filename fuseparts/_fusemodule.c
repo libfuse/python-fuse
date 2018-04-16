@@ -21,6 +21,15 @@
  * with both PyInt_Check and PyLong_Check.
  */
 
+#ifndef FUSE_USE_VERSION
+#define FUSE_USE_VERSION 26
+#endif
+
+#include <Python.h>
+#include <fuse.h>
+#include <sys/ioctl.h>
+
+
 #ifndef FUSE_VERSION
 #ifndef FUSE_MAKE_VERSION
 #define FUSE_MAKE_VERSION(maj, min)  ((maj) * 10 + (min))
@@ -28,14 +37,19 @@
 #define FUSE_VERSION FUSE_MAKE_VERSION(FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION)
 #endif
 
-#ifndef FUSE_USE_VERSION
-#define FUSE_USE_VERSION 26
+
+
+//#define FUSE_VERSION 29
+
+#if PY_MAJOR_VERSION >= 3
+    #define PyInt_FromLong PyLong_FromLong
+    #define PyInt_AsLong PyLong_AsLong
+    #define PyInt_Check PyLong_Check
+    #define PyInt_AsUnsignedLongLongMask PyLong_AsUnsignedLongLongMask
+    #define PyString_AsString PyUnicode_AsUTF8
+    #define PyString_Check PyUnicode_Check
+    #define PyString_Size PyUnicode_GET_SIZE
 #endif
-
-#include <Python.h>
-#include <fuse.h>
-
-#include <sys/ioctl.h>
 
 static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *mknod_cb=NULL, *mkdir_cb=NULL, *unlink_cb=NULL, *rmdir_cb=NULL,
@@ -54,20 +68,31 @@ static PyInterpreterState *interp;
 
 #ifdef WITH_THREAD
 
-#define PYLOCK()						\
-PyThreadState *_state = NULL;					\
-if (interp) {							\
+#if PY_MAJOR_VERSION >= 3
+#define PYLOCK() \
+  PyGILState_STATE gstate; \
+  gstate = PyGILState_Ensure();
+#else
+#define PYLOCK()                                                \
+  PyThreadState *_state = NULL;					\
+  if (interp) {							\
 	PyEval_AcquireLock();					\
 	_state = PyThreadState_New(interp);			\
 	PyThreadState_Swap(_state);				\
-}
+  }
+#endif
 
-#define PYUNLOCK() if (interp) {				\
+#if PY_MAJOR_VERSION >= 3
+#define PYUNLOCK() PyGILState_Release(gstate);
+#else
+#define PYUNLOCK()                                              \
+  if (interp) {                                                 \
 	PyThreadState_Clear(_state);				\
 	PyThreadState_Swap(NULL);				\
 	PyThreadState_Delete(_state);				\
 	PyEval_ReleaseLock();					\
-}
+  }
+#endif
  
 #else
 #define PYLOCK()
@@ -930,10 +955,25 @@ ioctl_func(const char *path, int cmd, void *arg,
 		input_data_size = 0;
 	}
 
+#if PY_MAJOR_VERSION >= 3
+	PROLOGUE(PYO_CALLWITHFI(fi, ioctl_cb, sIy#I, path,cmd,(char*)input_data,input_data_size,flags));
+#else
 	PROLOGUE(PYO_CALLWITHFI(fi, ioctl_cb, sIs#I, path,cmd,(char*)input_data,input_data_size,flags));
+#endif
 
 	// get returned value if this is a "read" ioctl
 	if(_IOC_DIR(cmd) & _IOC_READ) {
+
+#if PY_MAJOR_VERSION >= 3
+		if(!PyBytes_Check(v)) {
+			ret = -EINVAL;
+			goto OUT_DECREF;
+		}
+
+		output_data_size = PyBytes_Size(v);
+
+		s = PyBytes_AsString(v);
+#else
 
 		if(!PyString_Check(v)) {
 			ret = -EINVAL;
@@ -942,10 +982,12 @@ ioctl_func(const char *path, int cmd, void *arg,
 
 		output_data_size = PyString_Size(v);
 
+		s = PyString_AsString(v);
+#endif
+
 		if(output_data_size > _IOC_SIZE(cmd))
 			output_data_size = _IOC_SIZE(cmd);
 
-		s = PyString_AsString(v);
 		memcpy(data,s,output_data_size);
 		ret = 0;
 	}
@@ -1250,16 +1292,26 @@ static PyMethodDef Fuse_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef fuse_module = {
+	PyModuleDef_HEAD_INIT,
+	"_fuse",     /* m_name */
+	"FUSE module",  /* m_doc */
+	-1,                  /* m_size */
+	Fuse_methods
+};
+#endif
 
-/* Initialization function for the module (*must* be called init_fuse) */
-
-DL_EXPORT(void)
-init_fuse(void)
+PyObject *PyInit__fuse(void)
 {
 	PyObject *m, *d;
  
 	/* Create the module and add the functions */
-	m = Py_InitModule("_fuse", Fuse_methods);
+#if PY_MAJOR_VERSION >= 3
+	m = PyModule_Create(&fuse_module);
+#else
+	m = Py_InitModule3("_fuse", Fuse_methods, "FUSE module");
+#endif
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);
@@ -1267,4 +1319,14 @@ init_fuse(void)
 	PyDict_SetItemString(d, "FuseError", Py_FuseError);
 	/* compat */
 	PyDict_SetItemString(d, "error", Py_FuseError);
+
+	return m;
 }
+
+#if PY_MAJOR_VERSION == 2
+DL_EXPORT(void)
+init_fuse(void)
+{
+     PyInit__fuse();
+}
+#endif
