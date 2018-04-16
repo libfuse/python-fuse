@@ -39,8 +39,6 @@
 
 
 
-//#define FUSE_VERSION 29
-
 #if PY_MAJOR_VERSION >= 3
     #define PyInt_FromLong PyLong_FromLong
     #define PyInt_AsLong PyLong_AsLong
@@ -1040,11 +1038,11 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	        "removexattr", "access", "lock", "utimens", "bmap",
 		"fsinit", "fsdestroy", "ioctl", "fuse_args", "multithreaded", NULL
 	};
-	
+
 	memset(&op, 0, sizeof(op));
 
 	if (!PyArg_ParseTupleAndKeywords(args, kw,
-	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi", 
+	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi",
 	                                 kwlist, &getattr_cb, &readlink_cb,
 	                                 &readdir_cb, &mknod_cb, &mkdir_cb,
 	                                 &unlink_cb, &rmdir_cb, &symlink_cb,
