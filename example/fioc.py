@@ -165,7 +165,7 @@ class FiocFS(Fuse):
 
         self.do_write(path, buf, size, offset)
 
-    def trunate(self, path, size):
+    def truncate(self, path, size):
         if self.file_type(path) != FIOC_FILE:
             return -error.EINVAL
 
