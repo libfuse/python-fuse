@@ -127,7 +127,7 @@ class FiocFS(Fuse):
             st.st_mode = stat.S_IFDIR | 0o755
             st.st_nlink = 2
         elif ft == FIOC_FILE:
-            st.st_mode = stat.S_IFREG | 0o444
+            st.st_mode = stat.S_IFREG | 0o666
             st.st_nlink = 1
             st.st_size = len(self.buf)
         else:
@@ -158,12 +158,13 @@ class FiocFS(Fuse):
 
     def do_write(self, path, buf, offset):
         self.buf = self.buf[0:offset-1] + buf + self.buf[offset+len(buf)+1:len(self.buf)]
+        return len(buf)
 
     def write(self, path, buf, offset):
         if self.file_type(path) != FIOC_FILE:
             return -errno.EINVAL;
 
-        self.do_write(path, buf, offset)
+        return self.do_write(path, buf, offset)
 
     def truncate(self, path, size):
         if self.file_type(path) != FIOC_FILE:
