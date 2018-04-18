@@ -15,5 +15,5 @@ install:
 
 script:
   - sudo modprobe fuse
-  - mkdir /tmp/foo
-  - python example/hello.py /tmp/foo
+  - mkdir /tmp/foo && python example/hello.py /tmp/foo && [ $(cat /tmp/foo/hello) = "Hello World!" ]
+  - mkdir /tmp/bar && python example/fioc.py /tmp/bar && [ -f /tmp/bar/fioc ]
