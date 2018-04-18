@@ -156,14 +156,14 @@ class FiocFS(Fuse):
 
         return self.do_read(path, size, offset)
 
-    def do_write(self, path, buf, size, offset):
-        self.buf = self.buf[0:offset-1] + buf + self.buf[offset+size+1:len(self.buf)]
+    def do_write(self, path, buf, offset):
+        self.buf = self.buf[0:offset-1] + buf + self.buf[offset+len(buf)+1:len(self.buf)]
 
-    def write(self, path, buf, size, offset):
+    def write(self, path, buf, offset):
         if self.file_type(path) != FIOC_FILE:
             return -errno.EINVAL;
 
-        self.do_write(path, buf, size, offset)
+        self.do_write(path, buf, offset)
 
     def truncate(self, path, size):
         if self.file_type(path) != FIOC_FILE:
