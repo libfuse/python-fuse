@@ -21,6 +21,15 @@
  * with both PyInt_Check and PyLong_Check.
  */
 
+#ifndef FUSE_USE_VERSION
+#define FUSE_USE_VERSION 26
+#endif
+
+#include <Python.h>
+#include <fuse.h>
+#include <sys/ioctl.h>
+
+
 #ifndef FUSE_VERSION
 #ifndef FUSE_MAKE_VERSION
 #define FUSE_MAKE_VERSION(maj, min)  ((maj) * 10 + (min))
@@ -28,12 +37,7 @@
 #define FUSE_VERSION FUSE_MAKE_VERSION(FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION)
 #endif
 
-#ifndef FUSE_USE_VERSION
-#define FUSE_USE_VERSION 26
-#endif
 
-#include <Python.h>
-#include <fuse.h>
 
 #if PY_MAJOR_VERSION >= 3
     #define PyInt_FromLong PyLong_FromLong
@@ -54,7 +58,8 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *releasedir_cb=NULL, *fsyncdir_cb=NULL, *flush_cb=NULL, *ftruncate_cb=NULL,
   *fgetattr_cb=NULL, *getxattr_cb=NULL, *listxattr_cb=NULL, *setxattr_cb=NULL,
   *removexattr_cb=NULL, *access_cb=NULL, *lock_cb = NULL, *utimens_cb = NULL,
-  *bmap_cb = NULL, *fsinit_cb=NULL, *fsdestroy_cb = NULL;
+  *bmap_cb = NULL, *fsinit_cb=NULL, *fsdestroy_cb = NULL, *ioctl_cb = NULL;
+
 
 static PyObject *Py_FuseError;
 static PyInterpreterState *interp;
@@ -930,6 +935,64 @@ bmap_func(const char *path, size_t blocksize, uint64_t *idx)
 }
 #endif
 
+#if FUSE_VERSION >= 28
+static int
+ioctl_func(const char *path, int cmd, void *arg,
+	   struct fuse_file_info *fi, unsigned int flags, void *data)
+{
+	char* s;
+	char* input_data;
+	int input_data_size, output_data_size;
+
+	input_data = (char*) data;
+	input_data_size = _IOC_SIZE(cmd);
+
+	// If not a "write" ioctl, do not send input data
+	if(!(_IOC_DIR(cmd) & _IOC_WRITE)) {
+		input_data = NULL;
+		input_data_size = 0;
+	}
+
+#if PY_MAJOR_VERSION >= 3
+	PROLOGUE(PYO_CALLWITHFI(fi, ioctl_cb, sIy#I, path,cmd,(char*)input_data,input_data_size,flags));
+#else
+	PROLOGUE(PYO_CALLWITHFI(fi, ioctl_cb, sIs#I, path,cmd,(char*)input_data,input_data_size,flags));
+#endif
+
+	// get returned value if this is a "read" ioctl
+	if(_IOC_DIR(cmd) & _IOC_READ) {
+
+#if PY_MAJOR_VERSION >= 3
+		if(!PyBytes_Check(v)) {
+			ret = -EINVAL;
+			goto OUT_DECREF;
+		}
+
+		output_data_size = PyBytes_Size(v);
+
+		s = PyBytes_AsString(v);
+#else
+
+		if(!PyString_Check(v)) {
+			ret = -EINVAL;
+			goto OUT_DECREF;
+		}
+
+		output_data_size = PyString_Size(v);
+
+		s = PyString_AsString(v);
+#endif
+
+		if(output_data_size > _IOC_SIZE(cmd))
+			output_data_size = _IOC_SIZE(cmd);
+
+		memcpy(data,s,output_data_size);
+		ret = 0;
+	}
+	EPILOGUE
+}
+#endif
+
 static int
 pyfuse_loop_mt(struct fuse *f)
 {
@@ -973,13 +1036,13 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"create", "opendir", "releasedir", "fsyncdir", "flush",
 	        "ftruncate", "fgetattr", "getxattr", "listxattr", "setxattr",
 	        "removexattr", "access", "lock", "utimens", "bmap",
-		"fsinit", "fsdestroy", "fuse_args", "multithreaded", NULL
+		"fsinit", "fsdestroy", "ioctl", "fuse_args", "multithreaded", NULL
 	};
-	
+
 	memset(&op, 0, sizeof(op));
 
 	if (!PyArg_ParseTupleAndKeywords(args, kw,
-	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi", 
+	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi",
 	                                 kwlist, &getattr_cb, &readlink_cb,
 	                                 &readdir_cb, &mknod_cb, &mkdir_cb,
 	                                 &unlink_cb, &rmdir_cb, &symlink_cb,
@@ -994,7 +1057,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	                                 &listxattr_cb, &setxattr_cb,
 	                                 &removexattr_cb, &access_cb,
 	                                 &lock_cb, &utimens_cb, &bmap_cb,
-	                                 &fsinit_cb, &fsdestroy_cb,
+	                                 &fsinit_cb, &fsdestroy_cb, &ioctl_cb,
 	                                 &fargseq, &multithreaded))
 		return NULL;
 
@@ -1054,6 +1117,9 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 #if FUSE_VERSION >= 23
 	DO_ONE_ATTR_AS(init, fsinit);
 	DO_ONE_ATTR_AS(destroy, fsdestroy);
+#endif
+#if FUSE_VERSION >= 28
+	DO_ONE_ATTR(ioctl);
 #endif
 
 #undef DO_ONE_ATTR
