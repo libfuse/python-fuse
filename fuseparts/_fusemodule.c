@@ -29,7 +29,7 @@
 #include <fuse.h>
 #include <sys/ioctl.h>
 #ifndef _UAPI_ASM_GENERIC_IOCTL_H
-/* Essential IOCTL defitions from Linux /include/uapi/asm-generic/ioctl.h
+/* Essential IOCTL definitions from Linux /include/uapi/asm-generic/ioctl.h
    to fix compilation errors on FreeBSD 
    Mikhail Zakharov <zmey20000@thoo.com> 2018.10.22 */
 
