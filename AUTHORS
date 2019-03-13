@@ -12,3 +12,4 @@ Contributions
 hello.py by Andrew Straw <strawman@astraw.com>
 threading related code cleaned up by Miklos Szeredi <miklos@szeredi.hu>
 IOCTL support by Cédric Carrée
+poll support by David Lechner <david@lechnology.com>
