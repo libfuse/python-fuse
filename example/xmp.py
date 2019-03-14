@@ -29,7 +29,7 @@ fuse.feature_assert('stateful_files', 'has_init')
 
 
 def flag2mode(flags):
-    md = {os.O_RDONLY: 'r', os.O_WRONLY: 'w', os.O_RDWR: 'w+'}
+    md = {os.O_RDONLY: 'rb', os.O_WRONLY: 'wb', os.O_RDWR: 'wb+'}
     m = md[flags & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR)]
 
     if flags | os.O_APPEND:

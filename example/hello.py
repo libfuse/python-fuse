@@ -22,7 +22,7 @@ if not hasattr(fuse, '__version__'):
 fuse.fuse_python_api = (0, 2)
 
 hello_path = '/hello'
-hello_str = 'Hello World!\n'
+hello_str = b'Hello World!\n'
 
 class MyStat(fuse.Stat):
     def __init__(self):
@@ -72,7 +72,7 @@ class HelloFS(Fuse):
                 size = slen - offset
             buf = hello_str[offset:offset+size]
         else:
-            buf = ''
+            buf = b''
         return buf
 
 def main():

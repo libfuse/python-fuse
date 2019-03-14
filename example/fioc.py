@@ -96,7 +96,7 @@ class FiocFS(Fuse):
 
     def __init__(self, *args, **kw):
         Fuse.__init__(self, *args, **kw)
-        self.buf =  ""
+        self.buf =  b""
 
     def resize(self, new_size):
         old_size = len(self.buf)
@@ -106,7 +106,7 @@ class FiocFS(Fuse):
         if new_size < old_size:
             self.buf = self.buf[0:new_size]
         else:
-            self.buf = self.buf + "\x00" * (new_size - old_size)
+            self.buf = self.buf + b"\x00" * (new_size - old_size)
 
         return 0
 
