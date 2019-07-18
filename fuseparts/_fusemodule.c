@@ -518,12 +518,22 @@ read_func(const char *path, char *buf, size_t s, off_t off)
 	PROLOGUE( PYO_CALLWITHFI(fi, read_cb, snK, path, s, off) )
 #endif
 
+
+#if PY_MAJOR_VERSION >= 3
+	if(PyBytes_Check(v)) {
+		if(PyBytes_Size(v) > s)
+			goto OUT_DECREF;
+		memcpy(buf, PyBytes_AsString(v), PyBytes_Size(v));
+		ret = PyBytes_Size(v);
+	}
+#else
 	if(PyString_Check(v)) {
 		if(PyString_Size(v) > s)
 			goto OUT_DECREF;
 		memcpy(buf, PyString_AsString(v), PyString_Size(v));
 		ret = PyString_Size(v);
 	}
+#endif
 
 	EPILOGUE
 }
@@ -537,7 +547,11 @@ static int
 write_func(const char *path, const char *buf, size_t t, off_t off)
 #endif
 {
+#if PY_MAJOR_VERSION >= 3
+	PROLOGUE( PYO_CALLWITHFI(fi, write_cb, sy#K, path, buf, t, off) )
+#else
 	PROLOGUE( PYO_CALLWITHFI(fi, write_cb, ss#K, path, buf, t, off) )
+#endif
 	EPILOGUE
 }
 
