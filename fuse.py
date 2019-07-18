@@ -23,7 +23,7 @@ from errno import *
 from os import environ
 import re
 from fuseparts import __version__
-from fuseparts._fuse import main, FuseGetContext, FuseInvalidate
+from fuseparts._fuse import main, FuseGetContext, FuseInvalidate, FuseNotifyPoll
 from fuseparts._fuse import FuseError, FuseAPIVersion
 from fuseparts.subbedopts import SubOptsHive, SubbedOptFormatter
 from fuseparts.subbedopts import SubbedOptIndentedFormatter, SubbedOptParse
@@ -645,7 +645,7 @@ class Fuse(object):
               'statfs', 'fsync', 'create', 'opendir', 'releasedir', 'fsyncdir',
               'flush', 'fgetattr', 'ftruncate', 'getxattr', 'listxattr',
               'setxattr', 'removexattr', 'access', 'lock', 'utimens', 'bmap',
-              'fsinit', 'fsdestroy', 'ioctl']
+              'fsinit', 'fsdestroy', 'ioctl', 'poll']
 
     fusage = "%prog [mountpoint] [options]"
 
@@ -792,6 +792,9 @@ class Fuse(object):
 
     def Invalidate(self, path):
         return FuseInvalidate(self, path)
+
+    def NotifyPoll(self, pollhandle):
+        return FuseNotifyPoll(pollhandle)
 
     def fuseoptref(cls):
         """

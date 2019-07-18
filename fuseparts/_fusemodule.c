@@ -58,7 +58,8 @@ static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
   *releasedir_cb=NULL, *fsyncdir_cb=NULL, *flush_cb=NULL, *ftruncate_cb=NULL,
   *fgetattr_cb=NULL, *getxattr_cb=NULL, *listxattr_cb=NULL, *setxattr_cb=NULL,
   *removexattr_cb=NULL, *access_cb=NULL, *lock_cb = NULL, *utimens_cb = NULL,
-  *bmap_cb = NULL, *fsinit_cb=NULL, *fsdestroy_cb = NULL, *ioctl_cb = NULL;
+  *bmap_cb = NULL, *fsinit_cb=NULL, *fsdestroy_cb = NULL, *ioctl_cb = NULL,
+  *poll_cb = NULL;
 
 
 static PyObject *Py_FuseError;
@@ -991,6 +992,44 @@ ioctl_func(const char *path, int cmd, void *arg,
 	}
 	EPILOGUE
 }
+
+static const char pollhandle_name[] = "pollhandle";
+
+static void
+pollhandle_destructor(PyObject *p)
+{
+	struct fuse_pollhandle *ph;
+
+	ph = PyCapsule_GetPointer(p, pollhandle_name);
+	fuse_pollhandle_destroy(ph);
+}
+
+static int
+poll_func(const char *path, struct fuse_file_info *fi,
+	  struct fuse_pollhandle *ph, unsigned *reventsp)
+{
+	PyObject *pollhandle = Py_None;
+
+	if (ph)
+		pollhandle = PyCapsule_New(ph, pollhandle_name, pollhandle_destructor);
+
+	PROLOGUE(PYO_CALLWITHFI(fi, poll_cb, sO, path, pollhandle));
+
+OUT_DECREF:
+	Py_DECREF(v);
+OUT:
+	if (ph)
+		Py_DECREF(pollhandle);
+
+	PYUNLOCK();
+
+	if (ret > 0) {
+		*reventsp = ret;
+		ret = 0;
+	}
+
+	return ret;
+}
 #endif
 
 static int
@@ -1036,13 +1075,14 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		"create", "opendir", "releasedir", "fsyncdir", "flush",
 	        "ftruncate", "fgetattr", "getxattr", "listxattr", "setxattr",
 	        "removexattr", "access", "lock", "utimens", "bmap",
-		"fsinit", "fsdestroy", "ioctl", "fuse_args", "multithreaded", NULL
+		"fsinit", "fsdestroy", "ioctl",  "poll", "fuse_args",
+		"multithreaded", NULL
 	};
 
 	memset(&op, 0, sizeof(op));
 
 	if (!PyArg_ParseTupleAndKeywords(args, kw,
-	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi",
+	                                 "|OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOi",
 	                                 kwlist, &getattr_cb, &readlink_cb,
 	                                 &readdir_cb, &mknod_cb, &mkdir_cb,
 	                                 &unlink_cb, &rmdir_cb, &symlink_cb,
@@ -1058,7 +1098,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	                                 &removexattr_cb, &access_cb,
 	                                 &lock_cb, &utimens_cb, &bmap_cb,
 	                                 &fsinit_cb, &fsdestroy_cb, &ioctl_cb,
-	                                 &fargseq, &multithreaded))
+	                                 &poll_cb, &fargseq, &multithreaded))
 		return NULL;
 
 #define DO_ONE_ATTR_AS(fname, pyname)		\
@@ -1120,6 +1160,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 #endif
 #if FUSE_VERSION >= 28
 	DO_ONE_ATTR(ioctl);
+	DO_ONE_ATTR(poll);
 #endif
 
 #undef DO_ONE_ATTR
@@ -1282,11 +1323,32 @@ FuseAPIVersion(PyObject *self, PyObject *args)
 	return favers;
 }
 
+static const char FuseNotifyPoll__doc__[] = "Notify IO readiness event.";
+
+static PyObject *
+FuseNotifyPoll(PyObject *self, PyObject *arg)
+{
+	struct fuse_pollhandle *ph;
+	int ret;
+
+	ph = PyCapsule_GetPointer(arg, pollhandle_name);
+	if (!ph) {
+		PyErr_SetString(PyExc_TypeError,
+		                "pollhandle is not a FUSE poll handle");
+		return NULL;
+	}
+
+	ret = fuse_notify_poll(ph);
+
+	return PyInt_FromLong(ret);
+}
+
 static PyMethodDef Fuse_methods[] = {
 	{"main",	(PyCFunction)Fuse_main,	 METH_VARARGS|METH_KEYWORDS},
 	{"FuseGetContext", (PyCFunction)FuseGetContext, METH_VARARGS, FuseGetContext__doc__},
 	{"FuseInvalidate", (PyCFunction)FuseInvalidate, METH_VARARGS, FuseInvalidate__doc__},
 	{"FuseAPIVersion", (PyCFunction)FuseAPIVersion, METH_NOARGS,  FuseAPIVersion__doc__},
+	{"FuseNotifyPoll", (PyCFunction)FuseNotifyPoll, METH_O,       FuseNotifyPoll__doc__},
 	{NULL,		NULL}		/* sentinel */
 };
 
