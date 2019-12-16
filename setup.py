@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# distutils build script
 # To install fuse-python, run 'python setup.py install'
 
 # This setup.py based on that of shout-python (py bindings for libshout,
@@ -9,10 +8,8 @@
 
 try:
     from setuptools import setup
-    from setuptools.dist import Distribution
 except ImportError:
     from distutils.core import setup
-    from distutils.dist import Distribution
 from distutils.core import Extension
 import os
 import sys
@@ -32,22 +29,6 @@ classifiers = [ "Development Status :: 5 - Production/Stable",
                 "Programming Language :: Python :: 3.5",
                 "Programming Language :: Python :: 3.6",
                 "Topic :: System :: Filesystems" ]
-
-class MyDistribution(Distribution):
-    """
-    Obnoxious hack to enforce the packager to generate
-    the to-be-generated files
-    """
-
-#     def run_command(self, command):
-#         if command == 'sdist':
-#             for f in ('Changelog', 'README.new_fusepy_api.html'):
-#                  if not os.path.exists(f):
-#                      raise RuntimeError('file ' + repr(f) + \
-#                            " doesn't exist, please generate it before creating a source distribution")
-
-#         return Distribution.run_command(self, command)
-
 
 # write default fuse.pc path into environment if PKG_CONFIG_PATH is unset
 #if not os.environ.has_key('PKG_CONFIG_PATH'):
@@ -120,5 +101,4 @@ a simple interface for userspace programs to export a virtual filesystem to the 
        maintainer_email = 'sdelafond@gmail.com',
        ext_modules = [fusemodule],
        packages = ["fuseparts"],
-       py_modules=["fuse"],
-       distclass = MyDistribution)
+       py_modules=["fuse"])
