@@ -4,3 +4,4 @@ fuse_python.egg-info
 __pycache__
 *.pyc
 *.so
+wheelhouse
