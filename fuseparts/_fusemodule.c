@@ -8,10 +8,10 @@
     2004 Steven James <pyro@linuxlabs.com> and
     Linux Labs International, Inc. http://www.linuxlabs.com
 
-    Copyright (C) 2006-2007  Csaba Henk  <csaba.henk@creo.hu> 
+    Copyright (C) 2006-2007  Csaba Henk  <csaba.henk@creo.hu>
 */
 
-/* 
+/*
  * Local Variables:
  * indent-tabs-mode: t
  * c-basic-offset: 8
@@ -30,7 +30,7 @@
 #include <sys/ioctl.h>
 #ifndef _UAPI_ASM_GENERIC_IOCTL_H
 /* Essential IOCTL definitions from Linux /include/uapi/asm-generic/ioctl.h
-   to fix compilation errors on FreeBSD 
+   to fix compilation errors on FreeBSD
    Mikhail Zakharov <zmey20000@thoo.com> 2018.10.22 */
 
 #define _IOC_NRBITS     8
@@ -83,7 +83,27 @@
     #define PyInt_AsLong PyLong_AsLong
     #define PyInt_Check PyLong_Check
     #define PyInt_AsUnsignedLongLongMask PyLong_AsUnsignedLongLongMask
+#if PY_MINOR_VERSION >= 6
+    #define FIX_PATH_DECODING
+    PyObject* Path_AsDecodedUnicode(void* path) {
+        if (path) {
+            return PyUnicode_DecodeFSDefault(path);
+        goto ERROR;
+        }
+ERROR:
+        PyErr_SetString(PyExc_ValueError, "non-decodable filename");
+        return NULL;
+    }
+
+    char* MyString_AsEncodedPath(PyObject *unicode) {
+        return PyBytes_AsString(PyUnicode_EncodeFSDefault(unicode));
+    }
+
+// use appropriate utf-8 conversion
+    #define PyString_AsString MyString_AsEncodedPath
+#else
     #define PyString_AsString PyUnicode_AsUTF8
+#endif
     #define PyString_Check PyUnicode_Check
     #define PyString_Size PyUnicode_GET_SIZE
 #endif
@@ -131,7 +151,7 @@ static PyInterpreterState *interp;
 	PyEval_ReleaseLock();					\
   }
 #endif
- 
+
 #else
 #define PYLOCK()
 #define PYUNLOCK()
@@ -290,8 +310,11 @@ getattr_func(const char *path, struct stat *st)
 	PyObject *pytmp;
 	unsigned long long ctmp;
 
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(getattr_cb, "O&", &Path_AsDecodedUnicode, path) )
+#else
 	PROLOGUE( PyObject_CallFunction(getattr_cb, "s", path) )
-
+#endif
 	FETCH_STAT_DATA();
 
 	ret = 0;
@@ -306,7 +329,11 @@ fgetattr_func(const char *path, struct stat *st, struct fuse_file_info *fi)
 	PyObject *pytmp;
 	unsigned long long ctmp;
 
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PYO_CALLWITHFI(fi, fgetattr_cb, O&, &Path_AsDecodedUnicode, path) )
+#else
 	PROLOGUE( PYO_CALLWITHFI(fi, fgetattr_cb, s, path) )
+#endif
 
 	FETCH_STAT_DATA();
 
@@ -325,7 +352,11 @@ readlink_func(const char *path, char *link, size_t size)
 {
 	char *s;
 
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(readlink_cb, "O&", &Path_AsDecodedUnicode, path) )
+#else
 	PROLOGUE( PyObject_CallFunction(readlink_cb, "s", path) )
+#endif
 
 	if(!PyString_Check(v)) {
 		ret = -EINVAL;
@@ -343,7 +374,11 @@ readlink_func(const char *path, char *link, size_t size)
 static int
 opendir_func(const char *path, struct fuse_file_info *fi)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(opendir_cb, "O&", &Path_AsDecodedUnicode, path) )
+#else
 	PROLOGUE( PyObject_CallFunction(opendir_cb, "s", path) )
+#endif
 
 	fi->fh = (uintptr_t) v;
 
@@ -358,9 +393,15 @@ releasedir_func(const char *path, struct fuse_file_info *fi)
 {
 	PROLOGUE(
 	  fi_to_py(fi) ?
+#ifdef FIX_PATH_DECODING
+  	  PyObject_CallFunction(releasedir_cb, "O&N", &Path_AsDecodedUnicode, path,
+	                        fi_to_py(fi)) :
+	  PyObject_CallFunction(releasedir_cb, "O&", &Path_AsDecodedUnicode, path)
+#else
   	  PyObject_CallFunction(releasedir_cb, "sN", path,
 	                        fi_to_py(fi)) :
 	  PyObject_CallFunction(releasedir_cb, "s", path)
+#endif
 	)
 
 	EPILOGUE
@@ -391,12 +432,12 @@ dir_add_entry(PyObject *v, fuse_dirh_t buf, fuse_dirfil_t df)
 	fetchattr_nam(&st, st_mode, "type");
 	fetchattr(&offs, offset);
 
-	if (!(pytmp = PyObject_GetAttrString(v, "name"))) 
-		goto OUT_DECREF;		       
+	if (!(pytmp = PyObject_GetAttrString(v, "name")))
+		goto OUT_DECREF;		
 	if (!PyString_Check(pytmp)) {
 		Py_DECREF(pytmp);
-		goto OUT_DECREF;		       
-	}					       
+		goto OUT_DECREF;		
+	}					
 
 #if FUSE_VERSION >= 23
 	ret = df(buf, PyString_AsString(pytmp), &st, offs.offset);
@@ -427,8 +468,11 @@ static int
 readdir_func(const char *path, fuse_dirh_t buf, fuse_dirfil_t df)
 {
 	PyObject *iter, *w;
-
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(readdir_cb, "O&K", &Path_AsDecodedUnicode, path) )
+#else
 	PROLOGUE( PyObject_CallFunction(readdir_cb, "sK", path) )
+#endif
 #endif
 
 	iter = PyObject_GetIter(v);
@@ -455,70 +499,110 @@ readdir_func(const char *path, fuse_dirh_t buf, fuse_dirfil_t df)
 static int
 mknod_func(const char *path, mode_t m, dev_t d)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(mknod_cb, "O&ii", &Path_AsDecodedUnicode, path, m, d) )
+#else
 	PROLOGUE( PyObject_CallFunction(mknod_cb, "sii", path, m, d) )
+#endif
 	EPILOGUE
 }
 
 static int
 mkdir_func(const char *path, mode_t m)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(mkdir_cb, "O&i", &Path_AsDecodedUnicode, path, m) )
+#else
 	PROLOGUE( PyObject_CallFunction(mkdir_cb, "si", path, m) )
+#endif
 	EPILOGUE
 }
 
 static int
 unlink_func(const char *path)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(unlink_cb, "O&", &Path_AsDecodedUnicode, path) )
+#else
 	PROLOGUE( PyObject_CallFunction(unlink_cb, "s", path) )
+#endif
 	EPILOGUE
 }
 
 static int
 rmdir_func(const char *path)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(rmdir_cb, "O&", &Path_AsDecodedUnicode, path) )
+#else
 	PROLOGUE( PyObject_CallFunction(rmdir_cb, "s", path) )
+#endif
 	EPILOGUE
 }
 
 static int
 symlink_func(const char *path, const char *path1)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(symlink_cb, "O&O&", &Path_AsDecodedUnicode, path, &Path_AsDecodedUnicode, path1) )
+#else
 	PROLOGUE( PyObject_CallFunction(symlink_cb, "ss", path, path1) )
+#endif
 	EPILOGUE
 }
 
 static int
 rename_func(const char *path, const char *path1)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(rename_cb, "O&O&", &Path_AsDecodedUnicode, path, &Path_AsDecodedUnicode, path1) )
+#else
 	PROLOGUE( PyObject_CallFunction(rename_cb, "ss", path, path1) )
+#endif
 	EPILOGUE
 }
 
 static int
 link_func(const char *path, const char *path1)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(link_cb, "O&O&", &Path_AsDecodedUnicode, path, &Path_AsDecodedUnicode, path1) )
+#else
 	PROLOGUE( PyObject_CallFunction(link_cb, "ss", path, path1) )
+#endif
 	EPILOGUE
 }
 
 static int
-chmod_func(const char *path, mode_t m) 
+chmod_func(const char *path, mode_t m)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(chmod_cb, "O&i", &Path_AsDecodedUnicode, path, m) )
+#else
 	PROLOGUE( PyObject_CallFunction(chmod_cb, "si", path, m) )
+#endif
 	EPILOGUE
 }
 
 static int
-chown_func(const char *path, uid_t u, gid_t g) 
+chown_func(const char *path, uid_t u, gid_t g)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(chown_cb, "O&ii", &Path_AsDecodedUnicode, path, u, g) )
+#else
 	PROLOGUE( PyObject_CallFunction(chown_cb, "sii", path, u, g) )
+#endif
 	EPILOGUE
 }
 
 static int
 truncate_func(const char *path, off_t length)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(truncate_cb, "O&K", &Path_AsDecodedUnicode, path, length) )
+#else
 	PROLOGUE( PyObject_CallFunction(truncate_cb, "sK", path, length) )
+#endif
 	EPILOGUE
 }
 
@@ -526,7 +610,11 @@ truncate_func(const char *path, off_t length)
 static int
 ftruncate_func(const char *path, off_t length, struct fuse_file_info *fi)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PYO_CALLWITHFI(fi, ftruncate_cb, O&K, &Path_AsDecodedUnicode, path, length) )
+#else
 	PROLOGUE( PYO_CALLWITHFI(fi, ftruncate_cb, sK, path, length) )
+#endif
 	EPILOGUE
 }
 #endif
@@ -537,7 +625,11 @@ utime_func(const char *path, struct utimbuf *u)
 	int actime = u ? u->actime : time(NULL);
 	int modtime = u ? u->modtime : actime;
 	PROLOGUE(
+#ifdef FIX_PATH_DECODING
+	  PyObject_CallFunction(utime_cb, "O&(ii)", &Path_AsDecodedUnicode, path, actime, modtime)
+#else
 	  PyObject_CallFunction(utime_cb, "s(ii)", path, actime, modtime)
+#endif
 	)
 	EPILOGUE
 }
@@ -554,7 +646,11 @@ read_func(const char *path, char *buf, size_t s, off_t off)
 #if PY_VERSION_HEX < 0x02050000
 	PROLOGUE( PYO_CALLWITHFI(fi, read_cb, siK, path, s, off) )
 #else
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PYO_CALLWITHFI(fi, read_cb, O&nK, &Path_AsDecodedUnicode, path, s, off) )
+#else
 	PROLOGUE( PYO_CALLWITHFI(fi, read_cb, snK, path, s, off) )
+#endif
 #endif
 
 
@@ -600,7 +696,11 @@ open_func(const char *path, struct fuse_file_info *fi)
 {
 	PyObject *pytmp, *pytmp1;
 
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(open_cb, "O&i", &Path_AsDecodedUnicode, path, fi->flags) )
+#else
 	PROLOGUE( PyObject_CallFunction(open_cb, "si", path, fi->flags) )
+#endif
 
 	pytmp = PyTuple_GetItem(v, 0);
 
@@ -636,7 +736,11 @@ open_func(const char *path, struct fuse_file_info *fi)
 static int
 open_func(const char *path, int mode)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(open_cb, "O&i", &Path_AsDecodedUnicode, path, mode) )
+#else
 	PROLOGUE( PyObject_CallFunction(open_cb, "si", path, mode) )
+#endif
 	EPILOGUE
 }
 #endif
@@ -648,7 +752,11 @@ create_func(const char *path, mode_t mode, struct fuse_file_info *fi)
 	PyObject *pytmp, *pytmp1;
 
 	PROLOGUE(
+#ifdef FIX_PATH_DECODING
+	  PyObject_CallFunction(create_cb, "O&ii", &Path_AsDecodedUnicode, path, fi->flags, mode)
+#else
 	  PyObject_CallFunction(create_cb, "sii", path, fi->flags, mode)
+#endif
 	)
 
 	pytmp = PyTuple_GetItem(v, 0);
@@ -686,9 +794,17 @@ release_func(const char *path, struct fuse_file_info *fi)
 {
 	PROLOGUE(
 	  fi_to_py(fi) ?
+#ifdef FIX_PATH_DECODING
+	  PyObject_CallFunction(release_cb, "O&iN", &Path_AsDecodedUnicode, path, fi->flags,
+#else
 	  PyObject_CallFunction(release_cb, "siN", path, fi->flags,
+#endif
 	                        fi_to_py(fi)) :
+#ifdef FIX_PATH_DECODING
+	  PyObject_CallFunction(release_cb, "O&i", &Path_AsDecodedUnicode, path, fi->flags)
+#else
 	  PyObject_CallFunction(release_cb, "si", path, fi->flags)
+#endif
 	)
 #else
 static int
@@ -729,7 +845,7 @@ statfs_func(const char *dummy, struct statfs *fst)
 #endif
 
 	ret = 0;
- 
+
 	EPILOGUE
 }
 
@@ -741,7 +857,11 @@ static int
 fsync_func(const char *path, int datasync)
 #endif
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PYO_CALLWITHFI(fi, fsync_cb, O&i, &Path_AsDecodedUnicode, path, datasync) )
+#else
 	PROLOGUE( PYO_CALLWITHFI(fi, fsync_cb, si, path, datasync) )
+#endif
 	EPILOGUE
 }
 
@@ -753,7 +873,11 @@ static int
 flush_func(const char *path)
 #endif
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PYO_CALLWITHFI(fi, flush_cb, O&, &Path_AsDecodedUnicode, path) )
+#else
 	PROLOGUE( PYO_CALLWITHFI(fi, flush_cb, s, path) )
+#endif
 	EPILOGUE
 }
 
@@ -763,7 +887,11 @@ getxattr_func(const char *path, const char *name, char *value, size_t size)
 #if PY_VERSION_HEX < 0x02050000
 	PROLOGUE( PyObject_CallFunction(getxattr_cb, "ssi", path, name, size) )
 #else
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(getxattr_cb, "O&O&n", &Path_AsDecodedUnicode, path, &Path_AsDecodedUnicode, name, size) )
+#else
 	PROLOGUE( PyObject_CallFunction(getxattr_cb, "ssn", path, name, size) )
+#endif
 #endif
 
 	if(PyString_Check(v)) {
@@ -773,7 +901,7 @@ getxattr_func(const char *path, const char *name, char *value, size_t size)
         if (size == 0) {
 		    ret = PyString_Size(v);
 			goto OUT_DECREF;
-        } 
+        }
 
         /* If the size of the value buffer is too small to hold the result,  errno
          * is set to ERANGE.
@@ -798,7 +926,11 @@ listxattr_func(const char *path, char *list, size_t size)
 #if PY_VERSION_HEX < 0x02050000
 	PROLOGUE( PyObject_CallFunction(listxattr_cb, "si", path, size) )
 #else
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(listxattr_cb, "O&n", &Path_AsDecodedUnicode, path, size) )
+#else
 	PROLOGUE( PyObject_CallFunction(listxattr_cb, "sn", path, size) )
+#endif
 #endif
 	iter = PyObject_GetIter(v);
 	if(!iter) {
@@ -846,7 +978,11 @@ setxattr_func(const char *path, const char *name, const char *value,
               size_t size, int flags)
 {
 	PROLOGUE(
+#ifdef FIX_PATH_DECODING
+	  PyObject_CallFunction(setxattr_cb, "O&O&s#i", &Path_AsDecodedUnicode, path, &Path_AsDecodedUnicode, name, value, size,
+#else
 	  PyObject_CallFunction(setxattr_cb, "sss#i", path, name, value, size,
+#endif
 	                        flags)
 	)
 	EPILOGUE
@@ -855,7 +991,11 @@ setxattr_func(const char *path, const char *name, const char *value,
 static int
 removexattr_func(const char *path, const char *name)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(removexattr_cb, "O&O&", &Path_AsDecodedUnicode, path, &Path_AsDecodedUnicode, name) )
+#else
 	PROLOGUE( PyObject_CallFunction(removexattr_cb, "ss", path, name) )
+#endif
 	EPILOGUE
 }
 
@@ -863,7 +1003,11 @@ removexattr_func(const char *path, const char *name)
 static int
 access_func(const char *path, int mask)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PyObject_CallFunction(access_cb, "O&i", &Path_AsDecodedUnicode, path, mask) )
+#else
 	PROLOGUE( PyObject_CallFunction(access_cb, "si", path, mask) )
+#endif
 	EPILOGUE
 }
 #endif
@@ -906,8 +1050,13 @@ lock_func_i(const char *path, struct fuse_file_info *fi, int cmd,
 
 	pyargs =
 	fi_to_py(fi) ?
+#ifdef FIX_PATH_DECODING
+	Py_BuildValue("(O&iKO)", &Path_AsDecodedUnicode, path, cmd, fi->lock_owner, fi_to_py(fi)) :
+	Py_BuildValue("(O&iK)", &Path_AsDecodedUnicode, path, cmd, fi->lock_owner);
+#else
 	Py_BuildValue("(siKO)", path, cmd, fi->lock_owner, fi_to_py(fi)) :
-	Py_BuildValue("(siK)", path, cmd, fi->lock_owner); 
+	Py_BuildValue("(siK)", path, cmd, fi->lock_owner);
+#endif
 	if (! pyargs)
 		goto out;
 
@@ -951,10 +1100,15 @@ static int
 utimens_func(const char *path, const struct timespec ts[2])
 {
 	PROLOGUE(
-	  PyObject_CallFunction(utimens_cb, "siiii", path,
+	  PyObject_CallFunction(
+	#ifdef FIX_PATH_DECODING
+                                utimens_cb, "O&iiii", &Path_AsDecodedUnicode, path,
+	#else
+                                utimens_cb, "siiii", path,
+	#endif
 	                        ts[0].tv_sec, ts[0].tv_nsec,
 	                        ts[1].tv_sec, ts[1].tv_nsec)
-	)
+        )
 
 	EPILOGUE
 }
@@ -970,7 +1124,11 @@ bmap_func(const char *path, size_t blocksize, uint64_t *idx)
 #if PY_VERSION_HEX < 0x02050000
 	  PyObject_CallFunction(bmap_cb, "siK", path, blocksize, *idx)
 #else
+#ifdef FIX_PATH_DECODING
+	  PyObject_CallFunction(bmap_cb, "O&nK", &Path_AsDecodedUnicode, path, blocksize, *idx)
+#else
 	  PyObject_CallFunction(bmap_cb, "snK", path, blocksize, *idx)
+#endif
 #endif
 	)
 
@@ -1008,7 +1166,11 @@ ioctl_func(const char *path, int cmd, void *arg,
 	}
 
 #if PY_MAJOR_VERSION >= 3
+#ifdef FIX_PATH_DECODING
+	PROLOGUE(PYO_CALLWITHFI(fi, ioctl_cb, O&Iy#I, &Path_AsDecodedUnicode, path,cmd,(char*)input_data,input_data_size,flags));
+#else
 	PROLOGUE(PYO_CALLWITHFI(fi, ioctl_cb, sIy#I, path,cmd,(char*)input_data,input_data_size,flags));
+#endif
 #else
 	PROLOGUE(PYO_CALLWITHFI(fi, ioctl_cb, sIs#I, path,cmd,(char*)input_data,input_data_size,flags));
 #endif
@@ -1066,7 +1228,11 @@ poll_func(const char *path, struct fuse_file_info *fi,
 	if (ph)
 		pollhandle = PyCapsule_New(ph, pollhandle_name, pollhandle_destructor);
 
+#ifdef FIX_PATH_DECODING
+	PROLOGUE(PYO_CALLWITHFI(fi, poll_cb, O&O, &Path_AsDecodedUnicode, path, pollhandle));
+#else
 	PROLOGUE(PYO_CALLWITHFI(fi, poll_cb, sO, path, pollhandle));
+#endif
 
 OUT_DECREF:
 	Py_DECREF(v);
@@ -1300,7 +1466,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		PyErr_SetString(Py_FuseError, "service loop failed");
 
 		return (NULL);
-	}		 
+	}		
 
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -1418,7 +1584,7 @@ static struct PyModuleDef fuse_module = {
 PyObject *PyInit__fuse(void)
 {
 	PyObject *m, *d;
- 
+
 	/* Create the module and add the functions */
 #if PY_MAJOR_VERSION >= 3
 	m = PyModule_Create(&fuse_module);
