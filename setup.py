@@ -28,6 +28,9 @@ classifiers = [ "Development Status :: 5 - Production/Stable",
                 "Programming Language :: Python :: 3",
                 "Programming Language :: Python :: 3.5",
                 "Programming Language :: Python :: 3.6",
+                "Programming Language :: Python :: 3.7",
+                "Programming Language :: Python :: 3.8",
+                "Programming Language :: Python :: 3.9",
                 "Topic :: System :: Filesystems" ]
 
 # write default fuse.pc path into environment if PKG_CONFIG_PATH is unset
