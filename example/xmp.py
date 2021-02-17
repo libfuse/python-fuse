@@ -13,6 +13,7 @@ import os, sys
 from errno import *
 from stat import *
 import fcntl
+from threading import Lock
 # pull in some spaghetti to make this stuff work without fuse-py being installed
 try:
     import _find_fuse_parts
@@ -168,15 +169,32 @@ class Xmp(Fuse):
             self.file = os.fdopen(os.open("." + path, flags, *mode),
                                   flag2mode(flags))
             self.fd = self.file.fileno()
+            if hasattr(os, 'pread'):
+                self.iolock = None
+            else:
+                self.iolock = Lock()
 
         def read(self, length, offset):
-            self.file.seek(offset)
-            return self.file.read(length)
+            if self.iolock:
+                self.iolock.acquire()
+                try:
+                    self.file.seek(offset)
+                    return self.file.read(length)
+                finally:
+                    self.iolock.release()
+            else:
+                return os.pread(self.fd, length, offset)
 
         def write(self, buf, offset):
-            self.file.seek(offset)
-            self.file.write(buf)
-            return len(buf)
+            if self.iolock:
+                self.iolock.acquire()
+                try:
+                    self.file.seek(offset)
+                    return self.file.write(buf)
+                finally:
+                    self.iolock.release()
+            else:
+                return os.pwrite(self.fd, buf, offset)
 
         def release(self, flags):
             self.file.close()
