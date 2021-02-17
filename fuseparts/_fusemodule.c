@@ -410,7 +410,11 @@ releasedir_func(const char *path, struct fuse_file_info *fi)
 static int
 fsyncdir_func(const char *path, int datasync, struct fuse_file_info *fi)
 {
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PYO_CALLWITHFI(fi, fsyncdir_cb, &Oi, &Path_AsDecodedUnicode, path, datasync) )
+#else
 	PROLOGUE( PYO_CALLWITHFI(fi, fsyncdir_cb, si, path, datasync) )
+#endif
 	EPILOGUE
 }
 
@@ -462,7 +466,11 @@ readdir_func(const char *path, void *buf, fuse_fill_dir_t df, off_t off,
 {
 	PyObject *iter, *w;
 
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PYO_CALLWITHFI(fi, readdir_cb, O&K, &Path_AsDecodedUnicode, path, off) )
+#else
 	PROLOGUE( PYO_CALLWITHFI(fi, readdir_cb, sK, path, off) )
+#endif
 #else
 static int
 readdir_func(const char *path, fuse_dirh_t buf, fuse_dirfil_t df)
@@ -683,7 +691,11 @@ write_func(const char *path, const char *buf, size_t t, off_t off)
 #endif
 {
 #if PY_MAJOR_VERSION >= 3
+#ifdef FIX_PATH_DECODING
+	PROLOGUE( PYO_CALLWITHFI(fi, write_cb, O&y#K, &Path_AsDecodedUnicode, path, buf, t, off) )
+#else
 	PROLOGUE( PYO_CALLWITHFI(fi, write_cb, sy#K, path, buf, t, off) )
+#endif
 #else
 	PROLOGUE( PYO_CALLWITHFI(fi, write_cb, ss#K, path, buf, t, off) )
 #endif
