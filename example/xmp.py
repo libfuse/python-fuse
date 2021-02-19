@@ -190,7 +190,8 @@ class Xmp(Fuse):
                 self.iolock.acquire()
                 try:
                     self.file.seek(offset)
-                    return self.file.write(buf)
+                    self.file.write(buf)
+                    return len(buf)
                 finally:
                     self.iolock.release()
             else:
