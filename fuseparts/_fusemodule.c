@@ -85,27 +85,37 @@
     #define PyInt_AsUnsignedLongLongMask PyLong_AsUnsignedLongLongMask
 #if PY_MINOR_VERSION >= 6
     #define FIX_PATH_DECODING
+
     PyObject* Path_AsDecodedUnicode(void* path) {
         if (path) {
             return PyUnicode_DecodeFSDefault(path);
-        goto ERROR;
         }
-ERROR:
         PyErr_SetString(PyExc_ValueError, "non-decodable filename");
         return NULL;
     }
 
-    char* MyString_AsEncodedPath(PyObject *unicode) {
-        return PyBytes_AsString(PyUnicode_EncodeFSDefault(unicode));
-    }
-
-// use appropriate utf-8 conversion
-    #define PyString_AsString MyString_AsEncodedPath
 #else
     #define PyString_AsString PyUnicode_AsUTF8
 #endif
     #define PyString_Check PyUnicode_Check
     #define PyString_Size PyUnicode_GET_SIZE
+#endif
+
+#ifdef FIX_PATH_DECODING
+    // use appropriate utf-8 conversion
+    #define PATH_AS_STR_BEGIN(py_obj, str) \
+        PyObject *py_bytes_tmp = PyUnicode_EncodeFSDefault(py_obj); \
+        str = PyBytes_AsString(py_bytes_tmp);
+#else
+    #define PATH_AS_STR_BEGIN(py_obj, str) \
+        str = PyString_AsString(py_obj);
+#endif
+
+#ifdef FIX_PATH_DECODING
+    #define PATH_AS_STR_END \
+        Py_DECREF(py_bytes_tmp);
+#else
+    #define PATH_AS_STR_END
 #endif
 
 static PyObject *getattr_cb=NULL, *readlink_cb=NULL, *readdir_cb=NULL,
@@ -362,8 +372,10 @@ readlink_func(const char *path, char *link, size_t size)
 		ret = -EINVAL;
 		goto OUT_DECREF;
 	}
-	s = PyString_AsString(v);
+
+	PATH_AS_STR_BEGIN(v, s);
 	strncpy(link, s, size);
+	PATH_AS_STR_END;
 	link[size-1] = '\0';
 	ret = 0;
 
@@ -443,14 +455,16 @@ dir_add_entry(PyObject *v, fuse_dirh_t buf, fuse_dirfil_t df)
 		goto OUT_DECREF;		
 	}					
 
+	char *s;
+	PATH_AS_STR_BEGIN(pytmp, s);
 #if FUSE_VERSION >= 23
-	ret = df(buf, PyString_AsString(pytmp), &st, offs.offset);
+	ret = df(buf, s, &st, offs.offset);
 #elif FUSE_VERSION >= 21
-	ret = df(buf, PyString_AsString(pytmp), (st.st_mode & 0170000) >> 12,
-                 st.st_ino);
+	ret = df(buf, s, (st.st_mode & 0170000) >> 12, st.st_ino);
 #else
-	ret = df(buf, PyString_AsString(pytmp), (st.st_mode & 0170000) >> 12);
+	ret = df(buf, s, (st.st_mode & 0170000) >> 12);
 #endif
+	PATH_AS_STR_END;
 	Py_DECREF(pytmp);
 
 OUT_DECREF:
@@ -923,7 +937,10 @@ getxattr_func(const char *path, const char *name, char *value, size_t size)
 			goto OUT_DECREF;
         }
 
-		memcpy(value, PyString_AsString(v), PyString_Size(v));
+		char *s;
+		PATH_AS_STR_BEGIN(v, s);
+		memcpy(value, s, PyString_Size(v));
+		PATH_AS_STR_END;
 		ret = PyString_Size(v);
 	}
 
@@ -970,7 +987,10 @@ listxattr_func(const char *path, char *list, size_t size)
 			break;
 		}
 
-		strncpy(lx, PyString_AsString(w), ilen + 1);
+		char *s;
+		PATH_AS_STR_BEGIN(w, s);
+		strncpy(lx, s, ilen + 1);
+		PATH_AS_STR_END;
 		lx += ilen + 1;
 
 		Py_DECREF(w);
@@ -1407,6 +1427,11 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
  	fargv = malloc(fargc * sizeof(char *)); 	
 	if (!fargv)
 		return(PyErr_NoMemory());
+#ifdef FIX_PATH_DECODING
+	PyObject **tmp_bytes = malloc(fargc * sizeof(PyObject *));
+	if (!tmp_bytes)
+		return(PyErr_NoMemory());
+#endif
 
 	if (fargseq) {
 		for (i=0; i < fargc; i++) {
@@ -1420,7 +1445,12 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 			                        "fuse argument is not a string");
 		                return(NULL);
 			}
+#ifdef FIX_PATH_DECODING
+			tmp_bytes[i] = PyUnicode_EncodeFSDefault(pa);
+			fargv[i] = PyBytes_AsString(tmp_bytes[i]);
+#else
 			fargv[i] =  PyString_AsString(pa);
+#endif
 
 			Py_DECREF(pa);
 		}
@@ -1438,6 +1468,14 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 #else
 	fuse = __fuse_setup(fargc, fargv, &op, &fmp, &mthp, &fd);
 #endif
+
+#ifdef FIX_PATH_DECODING
+	for (i=0; i < fargc; i++)
+		Py_DECREF(tmp_bytes[i]);
+
+	free(tmp_bytes);
+#endif
+
 	free(fargv);
 
 	if (fuse == NULL) {
@@ -1503,9 +1541,10 @@ FuseInvalidate(PyObject *self, PyObject *args)
 		return(NULL);
 	}
 
-	path = PyString_AsString(arg1);
+	PATH_AS_STR_BEGIN(arg1, path);
 
 	err = fuse_invalidate(fuse, path);
+	PATH_AS_STR_END;
 
 	ret = PyInt_FromLong(err);
 
