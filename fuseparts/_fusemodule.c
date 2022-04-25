@@ -25,6 +25,7 @@
 #define FUSE_USE_VERSION 26
 #endif
 
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <fuse.h>
 #include <sys/ioctl.h>
@@ -1186,7 +1187,7 @@ ioctl_func(const char *path, int cmd, void *arg,
 {
 	char* s;
 	char* input_data;
-	int input_data_size, output_data_size;
+	Py_ssize_t input_data_size, output_data_size;
 
 	input_data = (char*) data;
 	input_data_size = _IOC_SIZE(cmd);
