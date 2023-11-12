@@ -4,7 +4,7 @@ source:
 	python3 setup.py sdist
 
 manylinux:
-	docker run --rm -it -e PLAT=manylinux2010_x86_64 -v $(PWD):/io:Z -w /io quay.io/pypa/manylinux2010_x86_64 bash -c "yum install -y fuse-devel && /opt/python/cp39-cp39/bin/python setup.py bdist_wheel && auditwheel repair dist/*.whl"
+	docker run --rm -it -e PLAT=manylinux_2_28 -v $(PWD):/io -w /io quay.io/pypa/manylinux_2_28_x86_64 bash -c "yum install -y fuse-devel && /opt/python/cp312-cp312/bin/python setup.py bdist_wheel && auditwheel repair dist/*.whl"
 
 clean:
 	python3 setup.py clean --all
