@@ -99,7 +99,7 @@
     #define PyString_AsString PyUnicode_AsUTF8
 #endif
     #define PyString_Check PyUnicode_Check
-    #define PyString_Size PyUnicode_GET_SIZE
+    #define PyString_Size PyUnicode_GET_LENGTH
 #endif
 
 #ifdef FIX_PATH_DECODING
