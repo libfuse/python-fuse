@@ -1,4 +1,4 @@
-import sys, os, glob
+import sys, glob
 from os.path import realpath, dirname, join
 from traceback import format_exception
 

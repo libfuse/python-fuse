@@ -110,7 +110,7 @@ class Xmp(Fuse):
 
 #    The following utimens method would do the same as the above utime method.
 #    We can't make it better though as the Python stdlib doesn't know of
-#    subsecond preciseness in acces/modify times.
+#    sub-second preciseness in access/modify times.
 #  
 #    def utimens(self, path, ts_acc, ts_mod):
 #      os.utime("." + path, (ts_acc.tv_sec, ts_mod.tv_sec))
@@ -134,7 +134,7 @@ class Xmp(Fuse):
 #        # We use the "user" namespace to please XFS utils
 #        aa = ["user." + a for a in ("foo", "bar")]
 #        if size == 0:
-#            # We are asked for size of the attr list, ie. joint size of attrs
+#            # We are asked for size of the attr list, i.e. joint size of attrs
 #            # plus null separators.
 #            return len("".join(aa)) + len(aa)
 #        return aa
@@ -146,7 +146,7 @@ class Xmp(Fuse):
         If you are not reusing an existing statvfs object, start with
         fuse.StatVFS(), and define the attributes.
 
-        To provide usable information (ie., you want sensible df(1)
+        To provide usable information (i.e., you want sensible df(1)
         output, you are suggested to specify the following attributes:
 
             - f_bsize - preferred size of file blocks, in bytes
