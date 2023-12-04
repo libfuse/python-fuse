@@ -17,7 +17,7 @@ fuse.fuse_python_api = (0, 2)
 
 class MyStat(fuse.Stat):
    def __init__(self):
-       self.st_mode = stat.S_IFDIR | 0755
+       self.st_mode = stat.S_IFDIR | 0o755
        self.st_ino = 0
        self.st_dev = 0
        self.st_nlink = 2
@@ -35,14 +35,14 @@ class CupsFS(fuse.Fuse):
        # Get our list of printers available.
        lpstat = Popen(['lpstat -p'], shell=True, stdout=PIPE)
        output = lpstat.communicate()[0]
-       lines = output.split('\n');
+       lines = output.split(b'\n')
        lpstat.wait()
 
        self.printers = {}
        self.files = {}
        self.lastfiles = {}
        for line in lines:
-           words = line.split(' ')
+           words = line.split(b' ')
            if len(words) > 2:
                self.printers[words[1]] = []
 
@@ -58,7 +58,7 @@ class CupsFS(fuse.Fuse):
        elif self.printers.has_key(pe[-1]):
            pass
        elif self.lastfiles.has_key(pe[-1]):
-           st.st_mode = stat.S_IFREG | 0666
+           st.st_mode = stat.S_IFREG | 0o666
            st.st_nlink = 1
            st.st_size = len(self.lastfiles[pe[-1]])
        else:
