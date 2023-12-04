@@ -1,4 +1,4 @@
-#====/usr/bin/env python====
+#!/usr/bin/env python
 
 #
 # cups.py: a FUSE filesystem for mounting an LDAP directory in Python
@@ -55,9 +55,9 @@ class CupsFS(fuse.Fuse):
        st.st_ctime = st.st_atime
        if path == '/':
            pass
-       elif self.printers.has_key(pe[-1]):
+       elif pe[-1] in self.printers:
            pass
-       elif self.lastfiles.has_key(pe[-1]):
+       elif pe[-1] in self.lastfiles:
            st.st_mode = stat.S_IFREG | 0o666
            st.st_nlink = 1
            st.st_size = len(self.lastfiles[pe[-1]])
@@ -68,7 +68,7 @@ class CupsFS(fuse.Fuse):
    def readdir(self, path, offset):
        dirents = [ '.', '..' ]
        if path == '/':
-           dirents.extend(self.printers.keys())
+           dirents.extend(list(self.printers.keys()))
        else:
            dirents.extend(self.printers[path[1:]])
        for r in dirents:
