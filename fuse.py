@@ -69,7 +69,7 @@ def get_compat_0_1():
     return get_fuse_python_api() == (0, 1)
 
 # API version to be used
-fuse_python_api = __getenv__('FUSE_PYTHON_API', '^[\d.]+$',
+fuse_python_api = __getenv__('FUSE_PYTHON_API', r'^[\d.]+$',
                               lambda x: tuple([int(i) for i in x.split('.')]))
 
 # deprecated way of API specification
@@ -554,7 +554,7 @@ def feature_needs(*feas):
             'has_bmap':       26,
             'has_init':       23,
             'has_destroy':    23,
-            '*':              '!re:^\*$'}
+            '*':              r'!re:^\*$'}
 
     if not feas:
         return fmap
@@ -569,7 +569,7 @@ def feature_needs(*feas):
                 for f in fp:
                     yield f
                 continue
-            ma = isinstance(fp, str) and re.compile("(!\s*|)re:(.*)").match(fp)
+            ma = isinstance(fp, str) and re.compile(r"(!\s*|)re:(.*)").match(fp)
             if isinstance(fp, type(re.compile(''))) or ma:
                 neg = False
                 if ma:
@@ -821,7 +821,7 @@ class Fuse(object):
         os.close(pw)
 
         fa = FuseArgs()
-        ore = re.compile("-o\s+([\w\[\]]+(?:=\w+)?)")
+        ore = re.compile(r"-o\s+([\w\[\]]+(?:=\w+)?)")
         fpr = os.fdopen(pr)
         for l in fpr:
              m = ore.search(l)
