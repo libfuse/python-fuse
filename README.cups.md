@@ -8,7 +8,7 @@ people new to FUSE. Here's my stab at one.
 
 Where I work, we access some government functions through a web based
 Java 3270 emulator. Recently, the government updated the Java client,
-and broke printing, so my users couldn't print out screen shots of
+and broke printing, so my users couldn't print out screenshots of
 information that they needed. Rather than trying to argue with the
 government that they should support my GNU/Linux clients, which would
 have gone nowhere, I started trying to come up with an alternative
@@ -32,7 +32,7 @@ So, it seemed the following would make sense:
 
   * The filesystem, when mounted, would have a directory for each of the printers on the system 
   * Under each of the "printer directories", any file could be created. 
-  * This file, when closed, would be sent to the printer who's directory it was in. 
+  * This file, when closed, would be sent to the printer whose directory it was in. 
 
 Seems simple enough. I've done this in Python, since it's fast to get
 something going in, and has good FUSE bindings.
@@ -47,7 +47,7 @@ dictionaries seemed to make the most sense:
      (in case you want to see the last thing printed for debugging, or
      to re-print it).
 
-So, by way of example, lets say we have 3 printers, babypus, dino, and
+So, by way of example, lets say we have 3 printers, babypuss, dino, and
 hoparoo. Barney prints to dino, Wilma and Betty print to babypuss, and
 Fred prints to hoparoo. So:
      
@@ -55,7 +55,7 @@ Fred prints to hoparoo. So:
      files = { "barney.txt": "blahblah...", "wilma.txt": "etcetc...", ...}
      lastfiles = { "barney.txt": "lastblahblah...", "wilma.txt": "lastetcetc...", ...}
     
-Fairly straightforward, and shouldn't take to much to get going. 
+Fairly straightforward, and shouldn't take too much to get going. 
 
 ### Implementation
 
@@ -88,6 +88,7 @@ First, we'll subclass the Fuse object in the usual manner, and define the *init*
        class CupsFS(fuse.Fuse):
        def __init__(self, *args, **kw):
            fuse.Fuse.__init__(self, *args, **kw)
+
 We'll need to get our list of printers. Let's split this out using the subprocess module: 
     
         lpstat = Popen(['lpstat -p'], shell=True, stdout=PIPE)
@@ -109,8 +110,8 @@ And, we'll build our dictionary of *printers*, and the (currently empty) diction
 
 Next, we'll need to make up some attributes. Since this is a "fake"
 filesystem (i.e. it isn't really storing real file objects), we can be
-a little "loosey goosey" with the file attributes. Lets have all files
-owned by root, with the directories mode 0755, and files 0666, so we
+a little "loosey goosey" with the file attributes. Let's have all files
+owned by root, with the directories' mode 0755, and files 0666, so we
 won't have to worry about access problems.
 
 So, first off, we'll need a separate class to return the status
@@ -134,7 +135,7 @@ subclass:
 The inode and dev numbers we can ignore, as FUSE will handle those for
 us. We'll make the default status object be a directory, so we set the
 number of links to two (all directories have at least 2 links, itself,
-and the link back to ..) and a size of 4096, which is usually the
+and the link back to ...) and a size of 4096, which is usually the
 "default" directory size. The access, modify, and change times are set
 to zero for now.
 
@@ -189,7 +190,7 @@ of the file with the all important `stat.S_IFREG`, which will mark
 this entry as a "regular" file, and give it mode 0666 (-rw-rw-rw). As
 well, we drop the link count to 1 (regular files that don't have hard
 links to them only have a link count of one), and set the size to the
-size of thestring stored in *lastfiles*. If the file was simply
+size of the string stored in *lastfiles*. If the file was simply
 created, via, say, the "touch" command, the *lastfiles* string will be
 zero length, and we'll get the expected return value. However, if
 we've written to a file, we'll get the size, as we'd expect if we do
@@ -227,7 +228,7 @@ And, if we're in a printer directory, we'd like to see the list of files:
     
 FUSE requires that you return the standard '.' and '..' files, plus
 the list of files you want to display. If we're in the root, we want
-to return the list of keys that's in our printers dictionary, and if
+to return the list of keys that's in our *printers* dictionary, and if
 we're in a printer directory, we want to return the list of files
 that's associated with that printer key.
 
@@ -248,7 +249,7 @@ associated with it, this is fairly simple:
 So, we start off with the list containing the '.' and '..' directory
 entries, and then check to see if we're in the root. If we are, we
 just add the list of keys by calling the *.keys()* method of the
-printers dictionary, and if not, we add the list associated with the
+*printers* dictionary, and if not, we add the list associated with the
 path we've been given.
 
 That's it. We should have a filesystem that we're able to cd around
@@ -262,11 +263,11 @@ create files, so we can print them! For that, we'll have to implement
 the mknod call.
 
 Since we're not doing anything fancy with our filesystem, like making
-pipes, or /dev nodes, etc, we don't have to worry about examining the
+pipes, or /dev nodes, etc., we don't have to worry about examining the
 *mode* and *dev* parameters we're passed. If you were trying to
 implement something more complicated, you would, but since this is a
 simple example, and a quick tutorial, we'll gloss over that. All *we*
-need to do, to add a file for printing, is add the filename to the
+need to do, to add a file for printing, is to add the filename to the
 printer entry in the *printers* dictionary, and create a new empty
 string entry in the *files* and *lastfiles* dictionaries for that
 file.
@@ -306,7 +307,7 @@ be handy to be able to "remove" the file, so we can see if the
 application that's printing to the file is recreating the "print job"
 when it's supposed to. So,
 
-lets implement the unlink function, so we can do a 
+let's implement the unlink function, so we can do a 
     
     rm wilma.txt
 
@@ -334,7 +335,7 @@ file to write the data to.
 Since we're just handling files that are 1) small and 2) linear, we
 don't have to worry about the offset! In a real filesystem you would,
 for say, doing random access reads and writes to a database file. But
-for our little "text print" filesystem, we can just concatinate any
+for our little "text print" filesystem, we can just concatenate any
 data we receive to the dictionary entry associated with the filename
 in the *files* dictionary.
     
