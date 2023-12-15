@@ -11,7 +11,7 @@ import stat
 import errno
 import fuse
 from time import time
-from subprocess import *
+from subprocess import Popen, PIPE
 
 fuse.fuse_python_api = (0, 2)
 
