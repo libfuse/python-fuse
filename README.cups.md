@@ -21,18 +21,18 @@ server.
 
 ### The Design
 
-We needed the following: 
+We needed the following:
 
-  * To print to any of the printers defined on the server. 
-  * To have multiple people print to the same printer on the same server 
-  * Screen prints are small, typically less than 2k of text 
-  * I needed to get it going quickly 
+  * To print to any of the printers defined on the server.
+  * To have multiple people print to the same printer on the same server
+  * Screen prints are small, typically less than 2k of text
+  * I needed to get it going quickly
 
-So, it seemed the following would make sense: 
+So, it seemed the following would make sense:
 
-  * The filesystem, when mounted, would have a directory for each of the printers on the system 
-  * Under each of the "printer directories", any file could be created. 
-  * This file, when closed, would be sent to the printer whose directory it was in. 
+  * The filesystem, when mounted, would have a directory for each of the printers on the system
+  * Under each of the "printer directories", any file could be created.
+  * This file, when closed, would be sent to the printer whose directory it was in.
 
 Seems simple enough. I've done this in Python, since it's fast to get
 something going in, and has good FUSE bindings.
@@ -50,12 +50,12 @@ dictionaries seemed to make the most sense:
 So, by way of example, lets say we have 3 printers, babypuss, dino, and
 hoparoo. Barney prints to dino, Wilma and Betty print to babypuss, and
 Fred prints to hoparoo. So:
-     
+
      printers = {"dino": [ "barney.txt" ], "babypuss": [ "wilma.txt", "betty.txt" ], "hoparoo": [ "fred.txt" ]}
      files = { "barney.txt": "blahblah...", "wilma.txt": "etcetc...", ...}
      lastfiles = { "barney.txt": "lastblahblah...", "wilma.txt": "lastetcetc...", ...}
-    
-Fairly straightforward, and shouldn't take too much to get going. 
+
+Fairly straightforward, and shouldn't take too much to get going.
 
 ### Implementation
 
@@ -79,25 +79,25 @@ we need:
        printer dino is idle.  enabled since Mon 14 Jul 2008 11:15:56 AM CDT
        printer hoparoo is idle.  enabled since Tue 08 Jul 2008 05:30:44 PM CDT
        sbalneav@bedrock:~$
-    
+
 So, we'll want to get this list going, and build our printer list in
 the *init* function using this output.
 
-First, we'll subclass the Fuse object in the usual manner, and define the *init* function: 
-    
+First, we'll subclass the Fuse object in the usual manner, and define the *init* function:
+
        class CupsFS(fuse.Fuse):
        def __init__(self, *args, **kw):
            fuse.Fuse.__init__(self, *args, **kw)
 
-We'll need to get our list of printers. Let's split this out using the subprocess module: 
-    
+We'll need to get our list of printers. Let's split this out using the subprocess module:
+
         lpstat = Popen(['lpstat -p'], shell=True, stdout=PIPE)
         output = lpstat.communicate()[0]
         lines = output.split(b'\n');
         lpstat.wait()
-    
+
 And, we'll build our dictionary of *printers*, and the (currently empty) dictionary of *files*, and *lastfiles*:
-    
+
        self.printers = {}
        self.files = {}
        self.lastfiles = {}
@@ -105,7 +105,7 @@ And, we'll build our dictionary of *printers*, and the (currently empty) diction
                words = line.split(b' ')
                if len(words) &gt; 2:
                    self.printers[words[1]] = []  # the second word on the line is the printer name
-    
+
 #### getattr
 
 Next, we'll need to make up some attributes. Since this is a "fake"
@@ -117,7 +117,7 @@ won't have to worry about access problems.
 So, first off, we'll need a separate class to return the status
 object. Fortunately, the Python fuse bindings give us one we can
 subclass:
-    
+
        class MyStat(fuse.Stat):
        def __init__(self):
            self.st_mode = stat.S_IFDIR | 0o755
@@ -130,7 +130,7 @@ subclass:
            self.st_atime = 0
            self.st_mtime = 0
            self.st_ctime = 0
-    
+
 
 The inode and dev numbers we can ignore, as FUSE will handle those for
 us. We'll make the default status object be a directory, so we set the
@@ -139,16 +139,16 @@ and the link back to ...) and a size of 4096, which is usually the
 "default" directory size. The access, modify, and change times are set
 to zero for now.
 
-As well, we'll need to provide the *getattr* function in the CupsFS object itself: 
- 
+As well, we'll need to provide the *getattr* function in the CupsFS object itself:
+
        def getattr(self, path):
            st = MyStat()
            pe = path.split('/')[1:]
-    
+
            st.st_atime = int(time())
            st.st_mtime = st.st_atime
            st.st_ctime = st.st_atime
-    
+
 
 So, we'll create a stat object, and split out our path we're handed on
 the '/' character, and set the access, modification, and change time
@@ -158,15 +158,15 @@ Well, for our little filesystem, we're either going to be handed paths
 like `/` for the root, `/printer` to look at the printer directory, or
 `/printer/file` to get attributes for one of the files, so, by
 breaking them into path elements:
-    
+
        >>> path = "/dino/barney.txt"
        >>> path.split('/')[1:]
        ['dino', 'barney.txt']
        >>>
-    
+
 We'll be able to look at the last element (`pe[-1]`), and see if it's
 either a printer, or a file. And that's what we'll do next:
-    
+
         if path == '/':                         # root
             pass
         elif pe[-1] in self.printers:           # a printer
@@ -178,7 +178,7 @@ either a printer, or a file. And that's what we'll do next:
         else:
             return -errno.ENOENT
         return st
-    
+
 
 So, if the path is '/' (the root), or, we can find the last path
 element in the *printers* dictionary (i.e. '/dino'), then we don't
@@ -201,12 +201,12 @@ If it didn't satisfy one of the three conditions ('/', '/printer',
 "no such file or directory" error if we try to access something that
 isn't there.
 
-So much for our simple getattr! On to readdir! 
+So much for our simple getattr! On to readdir!
 
 #### readdir
 
-If we're in the root directory of our filesystem, we'd like to see the list of printers: 
-    
+If we're in the root directory of our filesystem, we'd like to see the list of printers:
+
        sbalneav@bedrock:/printer$ ls -la
        total 40K
        drwxr-xr-x  2 root root 4.0K 2008-07-16 13:21 .
@@ -215,8 +215,8 @@ If we're in the root directory of our filesystem, we'd like to see the list of p
        drwxr-xr-x  2 root root 4.0K 2008-07-16 13:21 dino
        drwxr-xr-x  2 root root 4.0K 2008-07-16 13:21 hoparoo
        sbalneav@bedrock:/printer$
-   
-And, if we're in a printer directory, we'd like to see the list of files: 
+
+And, if we're in a printer directory, we'd like to see the list of files:
 
        sbalneav@bedrock:/printer/babypuss$ ls -la
        total 8.0K
@@ -225,7 +225,7 @@ And, if we're in a printer directory, we'd like to see the list of files:
        -rw-rw-rw- 1 root root    0 2008-07-16 13:24 betty.txt
        -rw-rw-rw- 1 root root    0 2008-07-16 13:24 wilma.txt
        sbalneav@bedrock:/printer/babypuss$
-    
+
 FUSE requires that you return the standard '.' and '..' files, plus
 the list of files you want to display. If we're in the root, we want
 to return the list of keys that's in our *printers* dictionary, and if
@@ -233,8 +233,8 @@ we're in a printer directory, we want to return the list of files
 that's associated with that printer key.
 
 Since each key in the *printers* dictionary has a list of the files
-associated with it, this is fairly simple: 
-    
+associated with it, this is fairly simple:
+
        def readdir(self, path, offset):
            dirents = [ '.', '..' ]
            if path == '/':
@@ -245,7 +245,7 @@ associated with it, this is fairly simple:
                dirents.extend(self.printers[path[1:]])
            for r in dirents:
                yield fuse.Direntry(r)
-    
+
 So, we start off with the list containing the '.' and '..' directory
 entries, and then check to see if we're in the root. If we are, we
 just add the list of keys by calling the *.keys()* method of the
@@ -278,7 +278,7 @@ file.
             self.files[pe[1]] = ""
             self.lastfiles[pe[1]] = ""
             return 0
-    
+
 So, once again, we split up the path elements to get the printer name
 and filename easily. We then append the filename to the list of files
 associated with that printer, and add the empty string dictionary
@@ -286,19 +286,19 @@ entries for the file.
 
 So, when we start up the filesystem, there won't be any files under
 the printers, but if we do a:
-    
+
     sbalneav@bedrock$ touch /printers/babypuss/wilma.txt
 
-the *mknod* function will be called, and we'll add the entry to the 
-*printers*, *files*, and *lastfiles* dictionaries, so that doing an 
-    
+the *mknod* function will be called, and we'll add the entry to the
+*printers*, *files*, and *lastfiles* dictionaries, so that doing an
+
     ls
 
-will now list 
-    
+will now list
+
     wilma.txt
 
-in the right place. 
+in the right place.
 
 #### unlink
 
@@ -307,15 +307,15 @@ be handy to be able to "remove" the file, so we can see if the
 application that's printing to the file is recreating the "print job"
 when it's supposed to. So,
 
-let's implement the unlink function, so we can do a 
-    
+let's implement the unlink function, so we can do a
+
     rm wilma.txt
 
 This is almost the exact opposite of the mknod. Now, we just want to
 remove the filename from the list associated with the printer, and
 delete the dictionary entries in the *files* and *lastfiles*
 dictionaries:
-    
+
         def unlink(self, path):
             pe = path.split('/')[1:]        # Path elements 0 = printer 1 = file
             self.printers[pe[0]].remove(pe[1])
@@ -323,7 +323,7 @@ dictionaries:
             del(self.lastfiles[pe[1]])
             return 0
 
-Simple. 
+Simple.
 
 #### write
 
@@ -338,12 +338,12 @@ for say, doing random access reads and writes to a database file. But
 for our little "text print" filesystem, we can just concatenate any
 data we receive to the dictionary entry associated with the filename
 in the *files* dictionary.
-    
+
         def write(self, path, buf, offset):
             pe = path.split('/')[1:]        # Path elements 0 = printer 1 = file
             self.files[pe[1]] += buf
             return len(buf)
-    
+
 the length of the buffer. The *write* system call expects you to
 return the *actual* amount of data read or written, so if you have a
 short write, the kernel can handle it appropriately. We won't worry
@@ -355,12 +355,12 @@ Reading's even simpler. We're just going to read from the *lastfiles*
 dictionary we're maintaining. We're passed a size and offset of the
 chunk to read, so all we need to do is take a string slice from the
 *lastfiles* dictionary.
-    
+
         def read(self, path, size, offset):
             pe = path.split('/')[1:]        # Path elements 0 = printer 1 = file
             return self.lastfiles[pe[1]][offset:offset+size]
 
-So, all that remains is: how do we actually print the data? 
+So, all that remains is: how do we actually print the data?
 
 #### release
 
@@ -389,8 +389,8 @@ print job does what you'd expect. If we didn't do that, every time
 you'd print onto that file, you'd get all the previous print jobs out
 as well.
 
-Once again, we'll use the subprocess module to pipe our data to lpr: 
-    
+Once again, we'll use the subprocess module to pipe our data to lpr:
+
         def release(self, path, flags):
             pe = path.split('/')[1:]        # Path elements 0 = printer 1 = file
             if len(self.files[pe[1]]) &gt; 0:
@@ -421,5 +421,5 @@ messy or impossible.
 Have fun, and enjoy
 
 ### Listing of cups.py
-    
+
 - [cups.py](example/cups.py)
