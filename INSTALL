@@ -32,5 +32,5 @@ your filesystem script to find them, no matter where it's residing.
 
 WARNING:
 We have altered from the original FUSE Python API in non-compatible
-ways. See README.new_fusepy_api how can you get running a fs which is
+ways. See README.new_fusepy_api.rst how can you get running a fs which is
 written against the original API.
