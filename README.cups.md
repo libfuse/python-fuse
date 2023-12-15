@@ -92,7 +92,7 @@ We'll need to get our list of printers. Let's split this out using the subproces
     
         lpstat = Popen(['lpstat -p'], shell=True, stdout=PIPE)
         output = lpstat.communicate()[0]
-        lines = output.split('\n');
+        lines = output.split(b'\n');
         lpstat.wait()
     
 And, we'll build our dictionary of *printers*, and the (currently empty) dictionary of *files*, and *lastfiles*:
@@ -101,7 +101,7 @@ And, we'll build our dictionary of *printers*, and the (currently empty) diction
        self.files = {}
        self.lastfiles = {}
            for line in lines:
-               words = line.split(' ')
+               words = line.split(b' ')
                if len(words) &gt; 2:
                    self.printers[words[1]] = []  # the second word on the line is the printer name
     
@@ -119,7 +119,7 @@ subclass:
     
        class MyStat(fuse.Stat):
        def __init__(self):
-           self.st_mode = stat.S_IFDIR | 0755
+           self.st_mode = stat.S_IFDIR | 0o755
            self.st_ino = 0
            self.st_dev = 0
            self.st_nlink = 2
@@ -168,10 +168,10 @@ either a printer, or a file. And that's what we'll do next:
     
         if path == '/':                         # root
             pass
-        elif self.printers.has_key(pe[-1]):     # a printer
+        elif pe[-1] in self.printers:           # a printer
             pass
-        elif self.lastfiles.has_key(pe[-1]):    # a file
-            st.st_mode = stat.S_IFREG | 0666
+        elif pe[-1] in self.lastfiles:          # a file
+            st.st_mode = stat.S_IFREG | o0666
             st.st_nlink = 1
             st.st_size = len(self.lastfiles[pe[-1]]
         else:
@@ -237,7 +237,7 @@ associated with it, this is fairly simple:
        def readdir(self, path, offset):
            dirents = [ '.', '..' ]
            if path == '/':
-               dirents.extend(self.printers.keys())
+               dirents.extend(list(self.printers.keys()))
            else:
                # Note use of path[1:] to strip the leading '/'
                # from the path, so we just get the printer name
