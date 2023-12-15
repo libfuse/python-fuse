@@ -103,7 +103,7 @@ And, we'll build our dictionary of *printers*, and the (currently empty) diction
        self.lastfiles = {}
            for line in lines:
                words = line.split(b' ')
-               if len(words) &gt; 2:
+               if len(words) > 2:
                    self.printers[words[1]] = []  # the second word on the line is the printer name
 
 #### getattr
@@ -393,7 +393,7 @@ Once again, we'll use the subprocess module to pipe our data to lpr:
 
         def release(self, path, flags):
             pe = path.split('/')[1:]        # Path elements 0 = printer 1 = file
-            if len(self.files[pe[1]]) &gt; 0:
+            if len(self.files[pe[1]]) > 0:
                 lpr = Popen(['lpr -P ' + pe[0]], shell=True, stdin=PIPE)
                 lpr.communicate(input=self.files[pe[1]])
                 lpr.wait()
