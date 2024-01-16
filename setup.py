@@ -7,10 +7,9 @@
 # part of the icecast project, http://svn.xiph.org/icecast/trunk/shout-python)
 
 try:
-    from setuptools import setup
+    from setuptools import setup, Extension
 except ImportError:
-    from distutils.core import setup
-from distutils.core import Extension
+    from distutils.core import setup, Extension
 import os
 import sys
 
