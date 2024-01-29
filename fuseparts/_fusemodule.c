@@ -678,7 +678,18 @@ read_func(const char *path, char *buf, size_t s, off_t off)
 
 
 #if PY_MAJOR_VERSION >= 3
-	if(PyBytes_Check(v)) {
+	Py_buffer buffer;	
+
+	if(PyObject_CheckBuffer(v)) {
+		PyObject_GetBuffer(v, &buffer, PyBUF_SIMPLE);
+
+		if(buffer.len <= s) {
+			memcpy(buf, buffer.buf, buffer.len);
+			ret = buffer.len;
+		}
+
+		PyBuffer_Release(&buffer);
+	} else if(PyBytes_Check(v)) {
 		if(PyBytes_Size(v) > s)
 			goto OUT_DECREF;
 		memcpy(buf, PyBytes_AsString(v), PyBytes_Size(v));
