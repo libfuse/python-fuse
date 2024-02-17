@@ -13,7 +13,7 @@ except ImportError:
 import os
 import sys
 
-from fuseparts import __version__ 
+from fuseparts import __version__
 
 classifiers = [ "Development Status :: 5 - Production/Stable",
                 "Intended Audience :: Developers",
@@ -51,7 +51,7 @@ if os.system('pkg-config --exists fuse 2> /dev/null') == 0:
 else:
     if os.system('pkg-config --help 2> /dev/null') == 0:
         print("""pkg-config could not find fuse:
-you might need to adjust PKG_CONFIG_PATH or your 
+you might need to adjust PKG_CONFIG_PATH or your
 FUSE installation is very old (older than 2.1-pre1)""")
 
     else:

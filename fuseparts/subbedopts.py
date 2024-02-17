@@ -35,7 +35,7 @@ class SubOptsHive(object):
 
         ra = (list(self.optlist) + sa) or ["(none)"]
         ra.sort()
-        return ra 
+        return ra
 
     def __str__(self):
         return "< opts: " + ", ".join(self._str_core()) + " >"

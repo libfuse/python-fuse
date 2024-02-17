@@ -111,7 +111,7 @@ class Xmp(Fuse):
 #    The following utimens method would do the same as the above utime method.
 #    We can't make it better though as the Python stdlib doesn't know of
 #    sub-second preciseness in access/modify times.
-#  
+#
 #    def utimens(self, path, ts_acc, ts_mod):
 #      os.utime("." + path, (ts_acc.tv_sec, ts_mod.tv_sec))
 
@@ -229,11 +229,11 @@ class Xmp(Fuse):
             # Advisory file locking is pretty messy in Unix, and the Python
             # interface to this doesn't make it better.
             # We can't do fcntl(2)/F_GETLK from Python in a platfrom independent
-            # way. The following implementation *might* work under Linux. 
+            # way. The following implementation *might* work under Linux.
             #
             # if cmd == fcntl.F_GETLK:
             #     import struct
-            # 
+            #
             #     lockdata = struct.pack('hhQQi', kw['l_type'], os.SEEK_SET,
             #                            kw['l_start'], kw['l_len'], kw['l_pid'])
             #     ld2 = fcntl.fcntl(self.fd, fcntl.F_GETLK, lockdata)
@@ -242,7 +242,7 @@ class Xmp(Fuse):
             #     res = {}
             #     for i in xrange(len(uld2)):
             #          res[flockfields[i]] = uld2[i]
-            #  
+            #
             #     return fuse.Flock(**res)
 
             # Convert fcntl-ish lock parameters to Python's weird
