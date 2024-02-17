@@ -23,11 +23,11 @@ Solutions:
 
 * Enforce the usage of a stabilized API (practically, API 25) with::
 
-    env CFLAGS=-DFUSE_USE_VERSION=25 python setup.py build 
+    env CFLAGS=-DFUSE_USE_VERSION=25 python setup.py build
 
 * Upgrade your FUSE installation. As of writing this, 2.6.0-pre3 is available.
 
-When I use a dedicated file class, how can I tell apart the cases when an instance of it is instantiated from a ``CREATE`` callback and when it's instantiated from an ``OPEN`` callback? 
+When I use a dedicated file class, how can I tell apart the cases when an instance of it is instantiated from a ``CREATE`` callback and when it's instantiated from an ``OPEN`` callback?
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 If your file class is instantiated via ``FUSE_OPEN``, then it's

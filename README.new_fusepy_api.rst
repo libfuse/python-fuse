@@ -111,7 +111,7 @@ Let's see how these are implemented.
    out of Python's, so raising an exception makes no sense. We could
    wrap some fs methods into format valifiers; currently we don't do
    that.)
-   
+
 
 FUSE and the command line
 -------------------------
@@ -316,7 +316,7 @@ options (which are not understood by the lib, according to the help
 message), and also purges out these from self, so the remainder can be
 safely passed down to FUSE.
 
-.. [#] We can argue that it's not that sad. We just pass on to FUSE 
+.. [#] We can argue that it's not that sad. We just pass on to FUSE
    what we get from the user and that either eats it or blows up. Why
    would we want more sophistication?
 
