@@ -407,11 +407,11 @@ releasedir_func(const char *path, struct fuse_file_info *fi)
 	PROLOGUE(
 	  fi_to_py(fi) ?
 #ifdef FIX_PATH_DECODING
-  	  PyObject_CallFunction(releasedir_cb, "O&N", &Path_AsDecodedUnicode, path,
+	  PyObject_CallFunction(releasedir_cb, "O&N", &Path_AsDecodedUnicode, path,
 	                        fi_to_py(fi)) :
 	  PyObject_CallFunction(releasedir_cb, "O&", &Path_AsDecodedUnicode, path)
 #else
-  	  PyObject_CallFunction(releasedir_cb, "sN", path,
+	  PyObject_CallFunction(releasedir_cb, "sN", path,
 	                        fi_to_py(fi)) :
 	  PyObject_CallFunction(releasedir_cb, "s", path)
 #endif
@@ -1436,7 +1436,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		return(NULL);
 	}
 
- 	fargv = malloc(fargc * sizeof(char *));
+	fargv = malloc(fargc * sizeof(char *));
 	if (!fargv)
 		return(PyErr_NoMemory());
 #ifdef FIX_PATH_DECODING
