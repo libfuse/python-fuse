@@ -407,11 +407,11 @@ releasedir_func(const char *path, struct fuse_file_info *fi)
 	PROLOGUE(
 	  fi_to_py(fi) ?
 #ifdef FIX_PATH_DECODING
-  	  PyObject_CallFunction(releasedir_cb, "O&N", &Path_AsDecodedUnicode, path,
+	  PyObject_CallFunction(releasedir_cb, "O&N", &Path_AsDecodedUnicode, path,
 	                        fi_to_py(fi)) :
 	  PyObject_CallFunction(releasedir_cb, "O&", &Path_AsDecodedUnicode, path)
 #else
-  	  PyObject_CallFunction(releasedir_cb, "sN", path,
+	  PyObject_CallFunction(releasedir_cb, "sN", path,
 	                        fi_to_py(fi)) :
 	  PyObject_CallFunction(releasedir_cb, "s", path)
 #endif
@@ -450,11 +450,11 @@ dir_add_entry(PyObject *v, fuse_dirh_t buf, fuse_dirfil_t df)
 	fetchattr(&offs, offset);
 
 	if (!(pytmp = PyObject_GetAttrString(v, "name")))
-		goto OUT_DECREF;		
+		goto OUT_DECREF;
 	if (!PyString_Check(pytmp)) {
 		Py_DECREF(pytmp);
-		goto OUT_DECREF;		
-	}					
+		goto OUT_DECREF;
+	}
 
 	char *s;
 	PATH_AS_STR_BEGIN(pytmp, s);
@@ -678,7 +678,7 @@ read_func(const char *path, char *buf, size_t s, off_t off)
 
 
 #if PY_MAJOR_VERSION >= 3
-	Py_buffer buffer;	
+	Py_buffer buffer;
 
 	if(PyObject_CheckBuffer(v)) {
 		PyObject_GetBuffer(v, &buffer, PyBUF_SIMPLE);
@@ -1436,7 +1436,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		return(NULL);
 	}
 
- 	fargv = malloc(fargc * sizeof(char *)); 	
+	fargv = malloc(fargc * sizeof(char *));
 	if (!fargv)
 		return(PyErr_NoMemory());
 #ifdef FIX_PATH_DECODING
@@ -1448,7 +1448,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	if (fargseq) {
 		for (i=0; i < fargc; i++) {
 			PyObject *pa;
-	
+
 			pa = PySequence_GetItem(fargseq, i);
 			if (!PyString_Check(pa)) {
 				Py_DECREF(pa);
@@ -1517,7 +1517,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 	}
 
 #if FUSE_VERSION >= 26
-	fuse_teardown(fuse, fmp);	
+	fuse_teardown(fuse, fmp);
 #elif FUSE_VERSION >= 22
 	fuse_teardown(fuse, fd, fmp);
 #else
@@ -1528,7 +1528,7 @@ Fuse_main(PyObject *self, PyObject *args, PyObject *kw)
 		PyErr_SetString(Py_FuseError, "service loop failed");
 
 		return (NULL);
-	}		
+	}
 
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -1580,15 +1580,15 @@ FuseGetContext(PyObject *self, PyObject *args)
 		return(NULL);
 
 	num = PyInt_FromLong(fc->uid);
-	PyDict_SetItemString(ret, "uid", num);	
+	PyDict_SetItemString(ret, "uid", num);
 	Py_XDECREF( num );
 
 	num = PyInt_FromLong(fc->gid);
-	PyDict_SetItemString(ret, "gid", num);	
+	PyDict_SetItemString(ret, "gid", num);
 	Py_XDECREF( num );
 
 	num = PyInt_FromLong(fc->pid);
-	PyDict_SetItemString(ret, "pid", num);	
+	PyDict_SetItemString(ret, "pid", num);
 	Py_XDECREF( num );
 
 	return(ret);

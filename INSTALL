@@ -3,8 +3,8 @@ REQUIREMENTS:
  - In general, Python 2.3 or newer.
    Version specific notes:
    - 2.4: this is the version the code is developed with, so you can
-     expect this one to work the most smoothly. 
-   - 2.3: in general, it seems to be useable. However, the optparse 
+     expect this one to work the most smoothly.
+   - 2.3: in general, it seems to be useable. However, the optparse
      module of Python 2.3 is out of date. This doesn't have fatal
      consequences, but if you want nice help optput / version info,
      you should either use optparse.py from 2.4 or install a recent

@@ -454,23 +454,23 @@ class Direntry(FuseStruct):
 class Flock(FuseStruct):
     """
     Class for representing flock structures (cf. fcntl(3)).
-    
+
     It makes sense to give values to the `l_type`, `l_start`,
     `l_len`, `l_pid` attributes (`l_whence` is not used by
     FUSE, see ``fuse.h``).
     """
 
     def __init__(self, name=None, **kw):
-    
+
         self.l_type  = None
         self.l_start = None
         self.l_len   = None
         self.l_pid   = None
- 
+
         kw['name'] = name
         FuseStruct.__init__(self, **kw)
 
- 
+
 class Timespec(FuseStruct):
     """
     Cf. struct timespec in time.h:
@@ -478,10 +478,10 @@ class Timespec(FuseStruct):
     """
 
     def __init__(self, name=None, **kw):
-    
+
         self.tv_sec  = None
         self.tv_nsec = None
- 
+
         kw['name'] = name
         FuseStruct.__init__(self, **kw)
 
@@ -664,13 +664,13 @@ class Fuse(object):
             raise RuntimeError(__name__ + """.fuse_python_api not defined.
 
 ! Please define """ + __name__ + """.fuse_python_api internally (eg.
-! 
+!
 ! (1)  """ + __name__ + """.fuse_python_api = """ + repr(FUSE_PYTHON_API_VERSION) + """
-! 
-! ) or in the enviroment (eg. 
-! 
+!
+! ) or in the enviroment (eg.
+!
 ! (2)  FUSE_PYTHON_API=0.1
-! 
+!
 ! ).
 !
 ! If you are actually developing a filesystem, probably (1) is the way to go.
@@ -684,7 +684,7 @@ class Fuse(object):
             malformed()
         for i in fuse_python_api:
             if not isinstance(i, int) or i < 0:
-                malformed() 
+                malformed()
 
         if fuse_python_api > FUSE_PYTHON_API_VERSION:
             raise RuntimeError("""
