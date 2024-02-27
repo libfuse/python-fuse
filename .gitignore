@@ -1,5 +1,6 @@
 build
 dist
+dist-*
 fuse_python.egg-info
 __pycache__
 *.pyc

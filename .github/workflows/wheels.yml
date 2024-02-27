@@ -1,0 +1,59 @@
+name: Python wheels
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  wheel:
+    runs-on: ubuntu-20.04
+    env:
+      TAGS: cp311-cp311 cp312-cp312
+
+    strategy:
+      matrix:
+        target:
+          # https://quay.io/organization/pypa
+          - [ manylinux_2_28, x86_64 ]
+          - [ manylinux_2_28, aarch64 ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build Python wheels
+        env:
+          POLICY: ${{ matrix.target[0] }}
+          PLATFORM: ${{ matrix.target[1] }}
+        run: make manylinux POLICY="$POLICY" PLATFORM="$PLATFORM" TAGS="$TAGS"
+
+      # https://github.com/actions/upload-artifact
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ join(matrix.target, '-') }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+          retention-days: 2
+
+  merge-artifacts:
+    name: Download and create one artifact from all jobs
+    needs: wheel
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: wheelhouse
+          pattern: wheels-*
+          merge-multiple: true
+
+      - run: ls -l wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: wheelhouse/*.whl
+          if-no-files-found: error

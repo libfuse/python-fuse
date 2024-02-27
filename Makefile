@@ -1,11 +1,25 @@
 all: source manylinux
 
+POLICY := manylinux_2_28
+PLATFORM := x86_64
+TAGS := cp312-cp312
+
 source:
 	python3 setup.py sdist
 
 manylinux:
-	docker run --rm -it -e PLAT=manylinux_2_28 -v $(PWD):/io -w /io quay.io/pypa/manylinux_2_28_x86_64 bash -c "yum install -y fuse-devel && /opt/python/cp312-cp312/bin/python setup.py bdist_wheel && auditwheel repair dist/*.whl"
+	docker run --rm -v $(PWD):/io -w /io quay.io/pypa/$(POLICY)_$(PLATFORM) \
+	    make build-wheels \
+            POLICY=$(POLICY) PLATFORM=$(PLATFORM) TAGS="$(TAGS)"
+
+build-wheels:
+	yum install -y fuse-devel
+	$(foreach tag,$(TAGS),$(MAKE) build-wheel TAG=$(tag) PATH="/opt/python/$(tag)/bin:$(PATH)";)
+
+build-wheel:
+	python -m build --wheel --outdir dist-$(POLICY)-$(PLATFORM)-$(TAG)
+	auditwheel repair dist-$(POLICY)-$(PLATFORM)-$(TAG)/*.whl
 
 clean:
 	python3 setup.py clean --all
-	rm -fr build dist fuse_python.egg-info wheelhouse
+	rm -fr build dist dist-* fuse_python.egg-info wheelhouse
