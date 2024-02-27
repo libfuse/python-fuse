@@ -1,7 +1,6 @@
 name: Python wheels
 
 on:
-  pull_request:
   push:
     tags:
       - "*"
