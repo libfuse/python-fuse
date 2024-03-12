@@ -89,7 +89,8 @@ if sys.version_info < (2, 3):
         if "classifiers" in kwargs:
             del kwargs["classifiers"]
         _setup(**kwargs)
-setup (name = 'fuse-python',
+
+setup(name='fuse-python',
        version = __version__,
        description = 'Bindings for FUSE',
        long_description = """This is a Python interface to libfuse (https://github.com/libfuse/libfuse),
