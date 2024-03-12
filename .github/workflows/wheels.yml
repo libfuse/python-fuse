@@ -62,20 +62,26 @@ jobs:
 
   merge-artifacts:
     name: Download and create one artifact from all jobs
-    needs: wheel
+    needs:
+      - sdist
+      - wheel
     runs-on: ubuntu-20.04
     steps:
-      - name: Download Artifacts
+      - name: Download sdist artifact
         uses: actions/download-artifact@v4
         with:
-          path: wheelhouse
+          path: dist
+          name: sdist
+
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
           pattern: wheels-*
           merge-multiple: true
 
-      - run: ls -l wheelhouse
-
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels
-          path: wheelhouse/*.whl
+          name: dist
+          path: dist
           if-no-files-found: error
