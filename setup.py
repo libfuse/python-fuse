@@ -39,6 +39,8 @@ classifiers = [ "Development Status :: 5 - Production/Stable",
 #if not os.environ.has_key('PKG_CONFIG_PATH'):
 #  os.environ['PKG_CONFIG_PATH'] = '/usr/local/lib/pkgconfig'
 
+libs = cflags = ''
+
 # Find fuse compiler/linker flag via pkgconfig
 if os.system('pkg-config --exists fuse 2> /dev/null') == 0:
     pkgcfg = os.popen('pkg-config --cflags fuse')
@@ -49,7 +51,7 @@ if os.system('pkg-config --exists fuse 2> /dev/null') == 0:
     pkgcfg.close()
 
 else:
-    if os.system('pkg-config --help 2> /dev/null') == 0:
+    if os.system('pkg-config --help 2>&1 >/dev/null') == 0:
         print("""pkg-config could not find fuse:
 you might need to adjust PKG_CONFIG_PATH or your
 FUSE installation is very old (older than 2.1-pre1)""")
@@ -89,7 +91,8 @@ if sys.version_info < (2, 3):
         if "classifiers" in kwargs:
             del kwargs["classifiers"]
         _setup(**kwargs)
-setup (name = 'fuse-python',
+
+setup(name='fuse-python',
        version = __version__,
        description = 'Bindings for FUSE',
        long_description = """This is a Python interface to libfuse (https://github.com/libfuse/libfuse),
