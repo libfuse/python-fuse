@@ -13,7 +13,7 @@ jobs:
          - "3.6"
         include:
          - python-version: "3.5"
-           env: PIP_TRUSTED_HOST: "pypi.python.org pypi.org files.pythonhosted.org"
+           env: PIP_TRUSTED_HOST="pypi.python.org pypi.org files.pythonhosted.org"
 
     steps:
       - uses: actions/checkout@v4
