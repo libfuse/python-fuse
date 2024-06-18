@@ -10,9 +10,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
-        include:
-         - python-version: "3.5"
-           pip-trusted-host: "pypi.python.org pypi.org files.pythonhosted.org"
 
     steps:
       - uses: actions/checkout@v4
@@ -21,8 +18,6 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-        env:
-          PIP_TRUSTED_HOST: ${{ matrix.pip-trusted-host }}
 
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
