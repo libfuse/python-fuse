@@ -94,12 +94,16 @@
         PyErr_SetString(PyExc_ValueError, "non-decodable filename");
         return NULL;
     }
-
+    static inline Py_ssize_t PyString_Size(PyObject *s) {
+        Py_ssize_t result = -1;
+        (void)PyUnicode_AsUTF8AndSize(s, &result);
+        return result;
+    }
 #else
     #define PyString_AsString PyUnicode_AsUTF8
+    #define PyString_Size PyUnicode_GET_LENGTH
 #endif
     #define PyString_Check PyUnicode_Check
-    #define PyString_Size PyUnicode_GET_LENGTH
 #endif
 
 #ifdef FIX_PATH_DECODING
