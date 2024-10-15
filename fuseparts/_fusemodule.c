@@ -1306,7 +1306,9 @@ pyfuse_loop_mt(struct fuse *f)
 #ifdef WITH_THREAD
 	PyThreadState *save;
 
+#if PY_VERSION_HEX < 0x03070000
 	PyEval_InitThreads();
+#endif
 	interp = PyThreadState_Get()->interp;
 	save = PyEval_SaveThread();
 	err = fuse_loop_mt(f);
