@@ -986,7 +986,7 @@ listxattr_func(const char *path, char *list, size_t size)
 	for (;;) {
 		size_t ilen;
 
-	        w = PyIter_Next(iter);
+		w = PyIter_Next(iter);
 		if (!w) {
 			ret = lx - list;
 			break;
