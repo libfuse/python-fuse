@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2001  Jeff Epler  <jepler@unpythonic.dhs.org>
+    Copyright (C) 2001  Jeff Epler  <jepler@gmail.com>
 
     This program can be distributed under the terms of the GNU LGPL.
     See the file COPYING.
