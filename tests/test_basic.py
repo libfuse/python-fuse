@@ -61,3 +61,6 @@ def test_fioc(filesystem):
         fcntl.ioctl(f.fileno(), FIOC_GET_SIZE, b)
         assert struct.unpack("L", b)[0] == 42
 
+@pytest.mark.fstype("xattr")
+def test_xattr(filesystem):
+    assert os.getxattr(filesystem / "utf8_attr", "user.xdg.comment").decode("utf-8") == 'ああ、メッセージは切り取られていない'

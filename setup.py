@@ -103,7 +103,7 @@ a simple interface for userspace programs to export a virtual filesystem to the 
        package_data={'': ['COPYING', 'AUTHORS', 'FAQ', 'INSTALL',
                           'README.md', 'README.new_fusepy_api.rst',
                           'README.package_maintainers.rst']},
-       author = 'Jeff Epler <jepler@unpythonic.dhs.org>, Csaba Henk <csaba.henk@creo.hu>, Steven James, Miklos Szeredi <miklos@szeredi.hu>, Sébastien Delafond<sdelafond@gmail.com>',
+       author = 'Csaba Henk <csaba.henk@creo.hu>, Steven James, Miklos Szeredi <miklos@szeredi.hu>, Sébastien Delafond<sdelafond@gmail.com>',
        maintainer = 'Sébastien Delafond',
        maintainer_email = 'sdelafond@gmail.com',
        ext_modules = [fusemodule],
