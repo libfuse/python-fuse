@@ -71,6 +71,7 @@ class IOCTL:
 FIOC_GET_SIZE = IOCTL._IOR(ord('E'),0, struct.calcsize("L"));
 FIOC_SET_SIZE = IOCTL._IOW(ord('E'),1, struct.calcsize("L"));
 
+print(f"{FIOC_GET_SIZE:x} {FIOC_SET_SIZE:x}")
 # object type
 FIOC_NONE = 0
 FIOC_ROOT = 1
