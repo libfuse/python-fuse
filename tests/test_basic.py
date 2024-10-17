@@ -35,7 +35,8 @@ def filesystem(request):
 
         deadline = time.time() + 1
         while time.time() < deadline:
-            if (result := proc.poll()) is not None:
+            result = proc.poll()
+            if result is not None:
                 if result != 0:
                     raise RuntimeError("Filesystem exited with an error: {result}")
                 return
