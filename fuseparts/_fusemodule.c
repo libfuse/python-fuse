@@ -1273,8 +1273,13 @@ poll_func(const char *path, struct fuse_file_info *fi,
 {
 	PyObject *pollhandle = Py_None;
 
-	if (ph)
+	if (ph) {
 		pollhandle = PyCapsule_New(ph, pollhandle_name, pollhandle_destructor);
+		if (!pollhandle) {
+			PyErr_Print();
+			goto OUT;
+		}
+	}
 
 #ifdef FIX_PATH_DECODING
 	PROLOGUE(PYO_CALLWITHFI(fi, poll_cb, O&O, &Path_AsDecodedUnicode, path, pollhandle));
