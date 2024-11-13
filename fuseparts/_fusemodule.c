@@ -1272,6 +1272,10 @@ poll_func(const char *path, struct fuse_file_info *fi,
 	  struct fuse_pollhandle *ph, unsigned *reventsp)
 {
 	PyObject *pollhandle = Py_None;
+	int ret = -EINVAL;
+	PyObject *v;
+
+	PYLOCK();
 
 	if (ph) {
 		pollhandle = PyCapsule_New(ph, pollhandle_name, pollhandle_destructor);
@@ -1282,10 +1286,22 @@ poll_func(const char *path, struct fuse_file_info *fi,
 	}
 
 #ifdef FIX_PATH_DECODING
-	PROLOGUE(PYO_CALLWITHFI(fi, poll_cb, O&O, &Path_AsDecodedUnicode, path, pollhandle));
+	v = PYO_CALLWITHFI(fi, poll_cb, O&O, &Path_AsDecodedUnicode, path, pollhandle);
 #else
-	PROLOGUE(PYO_CALLWITHFI(fi, poll_cb, sO, path, pollhandle));
+	v = PYO_CALLWITHFI(fi, poll_cb, sO, path, pollhandle);
 #endif
+	if (!v) {
+		PyErr_Print();
+		goto OUT;
+	}
+	if (v == Py_None) {
+		ret = 0;
+		goto OUT_DECREF;
+	}
+	if (PyInt_Check(v)) {
+		ret = PyInt_AsLong(v);
+		goto OUT_DECREF;
+	}
 
 OUT_DECREF:
 	Py_DECREF(v);
