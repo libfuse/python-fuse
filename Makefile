@@ -26,3 +26,5 @@ build-wheel:
 clean:
 	python3 setup.py clean --all
 	rm -fr build dist dist-* fuse_python.egg-info wheelhouse
+
+.PHONY: build
