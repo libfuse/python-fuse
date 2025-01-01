@@ -7,6 +7,9 @@ TAGS := cp312-cp312
 source:
 	python3 setup.py sdist
 
+build:
+	python3 setup.py build
+
 manylinux:
 	docker run --rm -v $(PWD):/io -w /io quay.io/pypa/$(POLICY)_$(PLATFORM) \
 	    make build-wheels \
