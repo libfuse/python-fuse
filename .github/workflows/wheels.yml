@@ -63,6 +63,7 @@ jobs:
       - name: Install build deps (macOS)
         if: runner.os == 'macOS'
         run: |
+          brew install --cask macfuse
           pip install build
 
       - name: Build Python macOS wheels
