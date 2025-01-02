@@ -60,6 +60,10 @@ jobs:
           PLATFORM: ${{ matrix.target[1] }}
         run: make manylinux POLICY="$POLICY" PLATFORM="$PLATFORM" TAGS="$TAGS"
 
+      - name: Install build deps (macOS)
+        if: runner.os == 'macOS'
+        run: pip install setuptools
+
       - name: Build Python macOS wheels
         if: runner.os == 'macOS'
         run: make build
