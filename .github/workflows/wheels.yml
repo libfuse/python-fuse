@@ -47,6 +47,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Build Python manylinux wheels
+        if: runner.os == 'Linux'
         env:
           POLICY: ${{ matrix.target[0] }}
           PLATFORM: ${{ matrix.target[1] }}
