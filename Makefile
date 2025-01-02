@@ -8,6 +8,9 @@ TAGS := cp312-cp312
 source:
 	python3 setup.py sdist
 
+build:
+	python3 setup.py build
+
 manylinux:
 	docker run --rm -v $(PWD):/io -w /io quay.io/pypa/$(POLICY)_$(PLATFORM) \
 	    make build-wheels \
@@ -24,3 +27,5 @@ build-wheel:
 clean:
 	$(PYTHON) setup.py clean --all
 	rm -fr build dist dist-* fuse_python.egg-info wheelhouse
+
+.PHONY: build
