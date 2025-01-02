@@ -60,6 +60,10 @@ jobs:
           brew install --cask macfuse
           pip install build
 
+      - name: Build Python macOS wheels
+        if: runner.os == 'macOS'
+        run: python -m build --wheel --outdir wheelhouse
+
       # https://github.com/actions/upload-artifact
       - uses: actions/upload-artifact@v4
         with:
