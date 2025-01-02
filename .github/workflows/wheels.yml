@@ -39,11 +39,12 @@ jobs:
       matrix:
         os:
           - ubuntu-20.04
-          - macos-latest
         target:
           # https://quay.io/organization/pypa
           - [ manylinux_2_28, x86_64 ]
           - [ manylinux_2_28, aarch64 ]
+        include:
+          - os: macos-latest
 
     steps:
       - uses: actions/checkout@v4
