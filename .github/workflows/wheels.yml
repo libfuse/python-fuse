@@ -54,6 +54,11 @@ jobs:
           PLATFORM: ${{ matrix.target[1] }}
         run: make manylinux POLICY="$POLICY" PLATFORM="$PLATFORM" TAGS="$TAGS"
 
+      - name: Install build deps (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          pip install build
+
       # https://github.com/actions/upload-artifact
       - uses: actions/upload-artifact@v4
         with:
