@@ -46,6 +46,8 @@ jobs:
 #          - [ manylinux_2_28, aarch64 ]
         include:
           - os: macos-latest
+            target:
+              - macosx-10.13-universal2
 
     steps:
       - uses: actions/checkout@v4
