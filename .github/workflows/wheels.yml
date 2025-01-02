@@ -60,6 +60,10 @@ jobs:
           PLATFORM: ${{ matrix.target[1] }}
         run: make manylinux POLICY="$POLICY" PLATFORM="$PLATFORM" TAGS="$TAGS"
 
+      - name: Build Python macOS wheels
+        if: runner.os == 'macOS'
+        run: make build
+
       # https://github.com/actions/upload-artifact
       - uses: actions/upload-artifact@v4
         with:
