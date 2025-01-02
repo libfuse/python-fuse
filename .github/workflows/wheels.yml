@@ -29,12 +29,15 @@ jobs:
           retention-days: 2
 
   wheel:
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
     env:
       TAGS: cp310-cp310 cp311-cp311 cp312-cp312
 
     strategy:
       matrix:
+        os:
+          - ubuntu-20.04
+          - macos-latest
         target:
           # https://quay.io/organization/pypa
           - [ manylinux_2_28, x86_64 ]
