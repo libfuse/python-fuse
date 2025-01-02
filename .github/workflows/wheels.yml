@@ -62,7 +62,8 @@ jobs:
 
       - name: Install build deps (macOS)
         if: runner.os == 'macOS'
-        run: pip install setuptools build
+        run: |
+          pip install build
 
       - name: Build Python macOS wheels
         if: runner.os == 'macOS'
