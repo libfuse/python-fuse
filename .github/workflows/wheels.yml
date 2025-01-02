@@ -46,7 +46,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Build Python wheels
+      - name: Build Python manylinux wheels
         env:
           POLICY: ${{ matrix.target[0] }}
           PLATFORM: ${{ matrix.target[1] }}
