@@ -64,6 +64,8 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew list | grep python
+          which pip python
+          python --version
           brew install --cask macfuse
           pip install build
 
