@@ -44,6 +44,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up QEMU
+        if: runner.os == 'Linux'
         uses: docker/setup-qemu-action@v3
 
       - name: Build Python manylinux wheels
