@@ -16,6 +16,10 @@ from fuseparts.setcompatwrap import set
 ##########
 
 
+class FuseError(OptParseError):
+    """Exception raised for FUSE-specific Optparing errors"""
+    pass
+
 
 class SubOptsHive(object):
     """
@@ -47,7 +51,7 @@ class SubOptsHive(object):
         with True value to optlist, stringify other values.
         """
 
-        for k, v in self.optdict.items():
+        for k, v in list(self.optdict.items()):
             if v == False:
                 self.optdict.pop(k)
             elif v == True:
@@ -242,7 +246,7 @@ class SubbedOptParse(OptionParser):
     def add_option(self, *args, **kwargs):
         if 'action' in kwargs and kwargs['action'] == 'store_hive':
             if 'subopt' in kwargs:
-                raise OptParseError(
+                raise FuseError(
                   """option can't have a `subopt' attr and `action="store_hive"' at the same time""")
             if not 'type' in kwargs:
                 kwargs['type'] = 'string'

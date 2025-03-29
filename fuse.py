@@ -27,7 +27,7 @@ from fuseparts._fuse import main, FuseGetContext, FuseInvalidate, FuseNotifyPoll
 from fuseparts._fuse import FuseError, FuseAPIVersion
 from fuseparts.subbedopts import SubOptsHive, SubbedOptFormatter
 from fuseparts.subbedopts import SubbedOptIndentedFormatter, SubbedOptParse
-from fuseparts.subbedopts import SUPPRESS_HELP, OptParseError
+from fuseparts.subbedopts import SUPPRESS_HELP, FuseError
 from fuseparts.setcompatwrap import set
 
 
@@ -282,7 +282,7 @@ class FuseOptParse(SubbedOptParse):
 
         if dsd == 'whine':
             def dsdcb(option, opt_str, value, parser):
-                raise RuntimeError("""
+                raise FuseError("""
 
 ! If you want the "-s" option to work, pass
 !
@@ -305,6 +305,7 @@ class FuseOptParse(SubbedOptParse):
             self.add_option('-s', action='callback', callback=dsdcb,
                             help=SUPPRESS_HELP)
 
+    add_argument = SubbedOptParse.add_option
 
     def exit(self, status=0, msg=None):
         if msg:
@@ -312,7 +313,7 @@ class FuseOptParse(SubbedOptParse):
 
     def error(self, msg):
         SubbedOptParse.error(self, msg)
-        raise OptParseError(msg)
+        raise FuseError(msg)
 
     def print_help(self, file=sys.stderr):
         SubbedOptParse.print_help(self, file)
@@ -331,7 +332,7 @@ class FuseOptParse(SubbedOptParse):
     def add_option(self, *opts, **attrs):
         if 'mountopt' in attrs:
             if opts or 'subopt' in attrs:
-                raise OptParseError(
+                raise FuseError(
                   "having options or specifying the `subopt' attribute conflicts with `mountopt' attribute")
             opts = ('-o',)
             attrs['subopt'] = attrs.pop('mountopt')
