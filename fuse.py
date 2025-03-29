@@ -22,13 +22,11 @@ import os
 from errno import *
 from os import environ
 import re
+import argparse
+from argparse import ArgumentParser, SUPPRESS
 from fuseparts import __version__
 from fuseparts._fuse import main, FuseGetContext, FuseInvalidate, FuseNotifyPoll
 from fuseparts._fuse import FuseError, FuseAPIVersion
-from fuseparts.subbedopts import SubOptsHive, SubbedOptFormatter
-from fuseparts.subbedopts import SubbedOptIndentedFormatter, SubbedOptParse
-from fuseparts.subbedopts import SUPPRESS_HELP, FuseError
-from fuseparts.setcompatwrap import set
 
 
 ##########
@@ -85,7 +83,7 @@ fuse_python_api = get_fuse_python_api()
 
 
 
-class FuseArgs(SubOptsHive):
+class FuseArgs:
     """
     Class representing a FUSE command line.
     """
@@ -95,11 +93,10 @@ class FuseArgs(SubOptsHive):
                       'foreground': '-f'}
 
     def __init__(self):
-
-        SubOptsHive.__init__(self)
-
         self.modifiers = {}
         self.mountpoint = None
+        self.optlist = set()
+        self.optdict = {}
 
         for m in self.fuse_modifiers:
             self.modifiers[m] = False
@@ -109,6 +106,14 @@ class FuseArgs(SubOptsHive):
                           '  ' + str(self.modifiers), '  -o ']) + \
                ',\n     '.join(self._str_core()) + \
                ' >'
+
+    def _str_core(self):
+        sa = []
+        for k, v in self.optdict.items():
+            sa.append(str(k) + '=' + str(v))
+        ra = (list(self.optlist) + sa) or ["(none)"]
+        ra.sort()
+        return ra
 
     def getmod(self, mod):
         return self.modifiers[mod]
@@ -130,7 +135,8 @@ class FuseArgs(SubOptsHive):
         """Mangle self into an argument array"""
 
         self.canonify()
-        args = [sys.argv and sys.argv[0] or "python"]
+        # Use the actual program name from sys.argv[0]
+        args = [os.path.basename(sys.argv[0]) if sys.argv else "python"]
         if self.mountpoint:
             args.append(self.mountpoint)
         for m, v in self.modifiers.items():
@@ -138,46 +144,83 @@ class FuseArgs(SubOptsHive):
                 args.append(self.fuse_modifiers[m])
 
         opta = []
-        for o, v in self.optdict.items():
-                opta.append(o + '=' + v)
-        opta.extend(self.optlist)
+        # Add options in a consistent order
+        for o in sorted(self.optlist):
+            opta.append(o)
+        for o, v in sorted(self.optdict.items()):
+            opta.append(o + '=' + v)
 
         if opta:
             args.append("-o" + ",".join(opta))
 
         return args
 
-    def filter(self, other=None):
-        """
-        Same as for SubOptsHive, with the following difference:
-        if other is not specified, `Fuse.fuseoptref()` is run and its result
-        will be used.
-        """
+    def canonify(self):
+        """Transform self to an equivalent canonical form"""
+        # Create a list of items to process to avoid modifying during iteration
+        items = list(self.optdict.items())
+        for k, v in items:
+            if v == False:
+                self.optdict.pop(k)
+            elif v == True:
+                self.optdict.pop(k)
+                self.optlist.add(v)
+            else:
+                self.optdict[k] = str(v)
 
+    def filter(self, other=None):
+        """Filter options based on another FuseArgs instance"""
         if not other:
             other = Fuse.fuseoptref()
 
-        return SubOptsHive.filter(self, other)
+        self.canonify()
+        other.canonify()
+
+        rej = self.__class__()
+        rej.optlist = self.optlist.difference(other.optlist)
+        self.optlist.difference_update(rej.optlist)
+        for x in self.optdict.copy():
+            if x not in other.optdict:
+                self.optdict.pop(x)
+                rej.optdict[x] = None
+
+        return rej
+
+    def add(self, opt, val=None):
+        """Add a suboption"""
+        ov = opt.split('=', 1)
+        o = ov[0]
+        v = len(ov) > 1 and ov[1] or None
+
+        if v:
+            if val is not None:
+                raise AttributeError("ambiguous option value")
+            val = v
+
+        if val == False:
+            return
+
+        if val in (None, True):
+            self.optlist.add(o)
+        else:
+            self.optdict[o] = val
 
 
+# Custom error class for FUSE-specific errors
+class FuseError(Exception):
+    """Exception raised for FUSE-specific errors"""
+    pass
 
-class FuseFormatter(SubbedOptIndentedFormatter):
-
-    def __init__(self, **kw):
-        if not 'indent_increment' in kw:
-            kw['indent_increment'] = 4
-        SubbedOptIndentedFormatter.__init__(self, **kw)
-
-    def store_option_strings(self, parser):
-        SubbedOptIndentedFormatter.store_option_strings(self, parser)
-        # 27 is how the lib stock help appears
-        self.help_position = max(self.help_position, 27)
-        self.help_width = self.width - self.help_position
+#  Custom action for the -s option
+class SingleThreadAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if parser.fuse:
+            parser.fuse.multithreaded = False
 
 
-class FuseOptParse(SubbedOptParse):
+class FuseOptParse(ArgumentParser):
     """
-    This class alters / enhances `SubbedOptParse` so that it's
+    This class alters / enhances `ArgumentParser` so that it's
     suitable for usage with FUSE.
 
     - When adding options, you can use the `mountopt` pseudo-attribute which
@@ -236,50 +279,52 @@ class FuseOptParse(SubbedOptParse):
       suggests the user to read this documentation.
 
     dash_o_handler
-      Argument should be a SubbedOpt instance (created with
-      ``action="store_hive"`` if you want it to be useful).
-      This lets you customize the handler of the ``-o`` option. For example,
+      Argument should be a handler for the ``-o`` option. For example,
       you can alter or suppress the generic ``-o`` entry in help output.
     """
 
     def __init__(self, *args, **kw):
 
         self.mountopts = []
+        self.fuse_args = kw.pop('fuse_args', FuseArgs())
+        dsd = kw.pop('dash_s_do', 'whine')
+        self.fetch_mp = kw.pop('fetch_mp', True)
+        smods = kw.pop('standard_mods', True)
+        self.fuse = kw.pop('fuse', None)
+        doh = kw.pop('dash_o_handler', None)
 
-        self.fuse_args = \
-            'fuse_args' in kw and kw.pop('fuse_args') or FuseArgs()
-        dsd = 'dash_s_do' in kw and kw.pop('dash_s_do') or 'whine'
-        if 'fetch_mp' in kw:
-            self.fetch_mp = bool(kw.pop('fetch_mp'))
-        else:
-            self.fetch_mp = True
-        if 'standard_mods' in kw:
-            smods = bool(kw.pop('standard_mods'))
-        else:
-            smods = True
-        if 'fuse' in kw:
-            self.fuse = kw.pop('fuse')
-        if not 'formatter' in kw:
-            kw['formatter'] = FuseFormatter()
-        doh = 'dash_o_handler' in kw and kw.pop('dash_o_handler')
+        # Handle version parameter
+        version = kw.pop('version', None)
+        if version:
+            kw['description'] = version
 
-        SubbedOptParse.__init__(self, *args, **kw)
+        # Call super().__init__() without version argument
+        super().__init__(*args, **kw)
 
+        # Add version action after super().__init__()
+        if version:
+            self.add_argument('--version', action='version', version=version)
+
+        # Add mountpoint argument first
+        if self.fetch_mp:
+            self.add_argument('mountpoint', nargs='?', help='Mount point')
+
+        # Add mount options handler
         if doh:
-            self.add_option(doh)
+            self.add_argument(doh)
         else:
-            self.add_option('-o', action='store_hive',
-                            subopts_hive=self.fuse_args, help="mount options",
-                            metavar="opt,[opt...]")
+            self.add_argument('-o', '--options', help="mount options",
+                            metavar="opt,[opt...]", dest='mount_options',
+                            action='store', default='')
 
+        # Add standard FUSE modifiers
         if smods:
-            self.add_option('-f', action='callback',
-                            callback=lambda *a: self.fuse_args.setmod('foreground'),
-                            help=SUPPRESS_HELP)
-            self.add_option('-d', action='callback',
-                            callback=lambda *a: self.fuse_args.add('debug'),
-                            help=SUPPRESS_HELP)
+            self.add_argument('-f', '--foreground', action='store_true',
+                            help=SUPPRESS, dest='foreground')
+            self.add_argument('-d', '--debug', action='store_true',
+                            help=SUPPRESS, dest='debug')
 
+        # Handle -s option based on dash_s_do setting
         if dsd == 'whine':
             def dsdcb(option, opt_str, value, parser):
                 raise FuseError("""
@@ -293,54 +338,64 @@ class FuseOptParse(SubbedOptParse):
 """)
 
         elif dsd == 'setsingle':
-            def dsdcb(option, opt_str, value, parser):
-                self.fuse.multithreaded = False
+            self.add_argument('-s', '--single', action=SingleThreadAction,
+                              nargs=0, help=SUPPRESS)
+        elif dsd != 'undef':
+            raise ValueError("key 'dash_s_do': uninterpreted value " + str(dsd))
 
-        elif dsd == 'undef':
-            dsdcb = None
-        else:
-            raise ArgumentError("key `dash_s_do': uninterpreted value " + str(dsd))
 
-        if dsdcb:
-            self.add_option('-s', action='callback', callback=dsdcb,
-                            help=SUPPRESS_HELP)
+    def parse_args(self, args=None, namespace=None):
+        """Parse command line arguments"""
+        if namespace is None:
+            namespace = argparse.Namespace()
 
-    add_argument = SubbedOptParse.add_option
+        # Store original args for mountpoint handling
+        original_args = args
 
-    def exit(self, status=0, msg=None):
-        if msg:
-            sys.stderr.write(msg)
+        # Parse arguments
+        parsed_args = super().parse_args(args, namespace)
 
-    def error(self, msg):
-        SubbedOptParse.error(self, msg)
-        raise FuseError(msg)
+        # Handle mountpoint
+        if hasattr(parsed_args, 'mountpoint') and parsed_args.mountpoint and self.fetch_mp:
+            self.fuse_args.mountpoint = os.path.realpath(parsed_args.mountpoint)
+        elif original_args and len(original_args) > 0 and not original_args[0].startswith('-'):
+            # If no mountpoint argument was provided but we have a positional argument
+            # that's not an option, use it as the mountpoint
+            self.fuse_args.mountpoint = os.path.realpath(original_args[0])
 
-    def print_help(self, file=sys.stderr):
-        SubbedOptParse.print_help(self, file)
-        self.fuse_args.setmod('showhelp')
+        # Handle modifiers
+        if hasattr(parsed_args, 'foreground') and parsed_args.foreground:
+            self.fuse_args.setmod('foreground')
+        if hasattr(parsed_args, 'debug') and parsed_args.debug:
+            self.fuse_args.add('debug')
 
-    def print_version(self, file=sys.stderr):
-        SubbedOptParse.print_version(self, file)
-        self.fuse_args.setmod('showversion')
+        # Handle mount options
+        if hasattr(parsed_args, 'mount_options') and parsed_args.mount_options:
+            for opt in parsed_args.mount_options.split(','):
+                self.fuse_args.add(opt)
 
-    def parse_args(self, args=None, values=None):
-        o, a = SubbedOptParse.parse_args(self, args, values)
-        if a and self.fetch_mp:
-            self.fuse_args.mountpoint = os.path.realpath(a.pop())
-        return o, a
+        return parsed_args
 
-    def add_option(self, *opts, **attrs):
-        if 'mountopt' in attrs:
-            if opts or 'subopt' in attrs:
-                raise FuseError(
-                  "having options or specifying the `subopt' attribute conflicts with `mountopt' attribute")
-            opts = ('-o',)
-            attrs['subopt'] = attrs.pop('mountopt')
-            if not 'dest' in attrs:
-                attrs['dest'] = attrs['subopt']
+    def add_argument(self, *args, **kwargs):
+        """Add an argument to the parser"""
+        if 'mountopt' in kwargs:
+            if args or 'action' in kwargs:
+                raise ValueError(
+                    "having options or specifying the `action' attribute conflicts with `mountopt' attribute")
+            kwargs['action'] = 'store'
+            kwargs['dest'] = kwargs.pop('mountopt')
+            args = ('-o', '--options')
 
-        SubbedOptParse.add_option(self, *opts, **attrs)
+        return super().add_argument(*args, **kwargs)
 
+    def error(self, message):
+        """Handle parsing errors"""
+        raise FuseError(message)
+
+    def exit(self, status=0, message=None):
+        """Handle parser exit"""
+        if message:
+            sys.stderr.write(message)
 
 
 ##########
@@ -693,8 +748,7 @@ class Fuse(object):
 ! However, the latest available is """ + repr(FUSE_PYTHON_API_VERSION) + """.
 """)
 
-        self.fuse_args = \
-            'fuse_args' in kw and kw.pop('fuse_args') or FuseArgs()
+        self.fuse_args = kw.pop('fuse_args', FuseArgs())
 
         if get_compat_0_1():
             return self.__init_0_1__(*args, **kw)
@@ -706,8 +760,12 @@ class Fuse(object):
         if not 'fuse_args' in kw:
             kw['fuse_args'] = self.fuse_args
         kw['fuse'] = self
-        parserclass = \
-          'parser_class' in kw and kw.pop('parser_class') or FuseOptParse
+        parserclass = kw.pop('parser_class', FuseOptParse)
+
+        # Handle version argument before passing to parser
+        version = kw.pop('version', None)
+        if version:
+            kw['description'] = version
 
         self.parser = parserclass(*args, **kw)
         self.methproxy = self.Methproxy()
@@ -715,16 +773,16 @@ class Fuse(object):
     def parse(self, *args, **kw):
         """Parse command line, fill `fuse_args` attribute."""
 
-        ev = 'errex' in kw and kw.pop('errex')
-        if ev and not isinstance(ev, int):
+        exit_value = kw.pop('errex', None)
+        if exit_value is not None and not isinstance(exit_value, int):
             raise TypeError("error exit value should be an integer")
 
         try:
             self.cmdline = self.parser.parse_args(*args, **kw)
-        except OptParseError:
-          if ev:
-              sys.exit(ev)
-          raise
+        except FuseError:
+            if exit_value is not None:
+                sys.exit(exit_value)
+            raise
 
         return self.fuse_args
 
