@@ -34,4 +34,4 @@ jobs:
       - name: Test
         run: |
           sudo modprobe fuse
-          python -m pytest
+          pytest
