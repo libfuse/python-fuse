@@ -29,28 +29,46 @@ jobs:
           retention-days: 2
 
   wheel:
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
     env:
       TAGS: cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313
 
     strategy:
       matrix:
+        os:
+          - ubuntu-20.04
         target:
           # https://quay.io/organization/pypa
           - [ manylinux_2_28, x86_64 ]
           - [ manylinux_2_28, aarch64 ]
+        include:
+          - os: macos-latest
+            target:
+              - macosx-10.13-universal2
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up QEMU
+        if: runner.os == 'Linux'
         uses: docker/setup-qemu-action@v3
 
-      - name: Build Python wheels
+      - name: Build Python manylinux wheels
+        if: runner.os == 'Linux'
         env:
           POLICY: ${{ matrix.target[0] }}
           PLATFORM: ${{ matrix.target[1] }}
         run: make manylinux POLICY="$POLICY" PLATFORM="$PLATFORM" TAGS="$TAGS"
+
+      - name: Install build deps (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install --cask macfuse
+          pip install build
+
+      - name: Build Python macOS wheels
+        if: runner.os == 'macOS'
+        run: python -m build --wheel --outdir wheelhouse
 
       # https://github.com/actions/upload-artifact
       - uses: actions/upload-artifact@v4
