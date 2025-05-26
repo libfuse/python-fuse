@@ -7,7 +7,7 @@ on:
 
 jobs:
   sdist:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,7 +29,7 @@ jobs:
           retention-days: 2
 
   wheel:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       TAGS: cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313
 
@@ -65,7 +65,7 @@ jobs:
     needs:
       - sdist
       - wheel
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Download sdist artifact
         uses: actions/download-artifact@v4
