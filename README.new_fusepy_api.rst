@@ -92,7 +92,7 @@ So what's new? The new API has put emphasis on the following themes:
 
 Let's see how these are implemented.
 
-.. [#] See ``examples/xmp.py`` for the argument list of the fs methods.
+.. [#] See ``example/xmp.py`` for the argument list of the fs methods.
 
    Regarding return values: in each method, you can signal success or
    error by returning ``0`` (*success*), a negative number (*error*,
